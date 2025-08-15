@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Anagram Hunter</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <h1>Anagram Hunter</h1>
+    <p class="subtitle">辞書署名インデックスで高速アナグラム探索</p>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>1) 入力</h2>
+      <div class="row">
+        <div class="col">
+          <label>文字列:
+            <input type="text" id="letters" placeholder="LISTEN / SILENT など" />
+          </label>
+          <button id="normalizeBtn" class="btn">正規化（A–Z）</button>
+          <button id="clearBtn" class="btn btn-ghost">クリア</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>最小長: <input type="number" id="minLen" min="1" value="2" /></label>
+          <label>最大長: <input type="number" id="maxLen" min="1" value="20" /></label>
+          <label>必須文字: <input type="text" id="mustInclude" placeholder="例: T, AE など" /></label>
+          <label>除外文字: <input type="text" id="mustExclude" placeholder="例: QZ など" /></label>
+        </div>
+        <div class="col">
+          <label>先頭: <input type="text" id="startsWith" placeholder="^PAT" /></label>
+          <label>末尾: <input type="text" id="endsWith" placeholder="ING$" /></label>
+          <label>部分一致: <input type="text" id="contains" placeholder="ANY" /></label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label class="chk">
+            <input type="checkbox" id="twoWordMode" />
+            2語アナグラム探索を有効化（教育用MVP）
+          </label>
+          <label>ビーム幅: <input type="number" id="beamWidth" min="1" value="200" /></label>
+          <label>上位N件: <input type="number" id="topN" min="1" value="200" /></label>
+        </div>
+      </div>
+
+      <div class="row run-actions">
+        <button id="runBtn" class="btn btn-primary">探索</button>
+        <span id="status" class="status"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2) 結果</h2>
+      <div class="result-actions">
+        <button id="exportCsvBtn" class="btn btn-ghost">CSVエクスポート</button>
+        <button id="exportJsonBtn" class="btn btn-ghost">JSONエクスポート</button>
+        <span id="resultInfo" class="muted"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="resultTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>候補</th>
+              <th>タイプ</th>
+              <th>長さ</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3) 辞書</h2>
+      <div class="row">
+        <div class="col">
+          <input type="file" id="wordlistFile" accept=".txt" />
+          <button id="loadWordlistBtn" class="btn">辞書を読み込み</button>
+        </div>
+        <div class="col">
+          <label>相対パス（Pages）:
+            <input type="text" id="wordlistPath" placeholder="wordlists/english-words-5k.txt" />
+          </label>
+          <button id="fetchWordlistBtn" class="btn btn-secondary">fetchで取得</button>
+        </div>
+      </div>
+      <p class="muted" id="dictStatus">辞書：内蔵ミニ辞書（非常に小）</p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer">
+      🔗 GitHubリポジトリはこちら（ <a href="https://github.com/ipusiron/anagram-hunter" target="_blank">ipusiron/anagram-hunter</a> ）
+    </div>
+  </footer>
+
+  <script src="./script.js"></script>
+</body>
+</html>
