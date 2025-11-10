@@ -384,7 +384,7 @@ function updateSingleResultsDisplay() {
       <td><code>${r.word}</code></td>
       <td>${r.kind}</td>
       <td>${r.word.length}</td>
-      <td><a href="https://eow.alc.co.jp/search?q=${r.word}" target="_blank" class="dict-link" title="英辞郎で意味を調べる">🔍</a></td>
+      <td><a href="https://eow.alc.co.jp/search?q=${r.word}" target="_blank" rel="noopener noreferrer" class="dict-link" title="英辞郎で意味を調べる">🔍</a></td>
     `;
     tbody.appendChild(tr);
   }
@@ -424,7 +424,7 @@ function updateTwoWordResultsDisplay() {
       <td><code>${display}</code></td>
       <td>${r.kind}</td>
       <td>${r.len}</td>
-      <td><a href="https://eow.alc.co.jp/search?q=${searchQuery}" target="_blank" class="dict-link" title="英辞郎で意味を調べる">🔍</a></td>
+      <td><a href="https://eow.alc.co.jp/search?q=${searchQuery}" target="_blank" rel="noopener noreferrer" class="dict-link" title="英辞郎で意味を調べる">🔍</a></td>
     `;
     tbody.appendChild(tr);
   }

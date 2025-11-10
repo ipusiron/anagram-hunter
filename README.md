@@ -74,6 +74,7 @@
 ### 付属辞書
 - `wordlists/animals.txt`：動物名辞書（694語）
 - `wordlists/english_5067.txt`：一般英単語辞書（5067語）
+- `wordlists/security.txt`：セキュリティ・暗号用語辞書（1000語以上）
 
 ---
 
@@ -100,7 +101,7 @@
 ## ディレクトリー構成
 
 ```
-/ (repo root)
+/ anagram-hunter
 ├─ index.html          # メインHTML
 ├─ style.css           # スタイルシート
 ├─ script.js           # JavaScriptロジック
@@ -108,7 +109,8 @@
 └─ wordlists/          # 辞書ファイル
    ├─ animals.txt      # 動物名辞書（694語）
    ├─ english_1842.txt # 英単語辞書（1842語）
-   └─ english_5067.txt # 英単語辞書（5067語）
+   ├─ english_5067.txt # 英単語辞書（5067語）
+   └─ security.txt     # セキュリティ・暗号用語辞書（1000語以上）
 ```
 
 ---
