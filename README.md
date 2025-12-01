@@ -1,3 +1,39 @@
+<!--
+---
+id: day045
+slug: anagram-hunter
+
+title: "Anagram Hunter"
+
+subtitle_ja: "高速アナグラム探索ツール"
+subtitle_en: "Fast Anagram Search Tool"
+
+description_ja: "辞書照合と署名インデックスを用いて、入力文字列から単語・2語のアナグラムを高速に探索するWebツール"
+description_en: "A web tool that rapidly finds single-word and two-word anagrams from input strings using dictionary lookup and signature indexing"
+
+category_ja:
+  - 暗号解読
+  - 文字列解析
+category_en:
+  - Cryptanalysis
+  - String Analysis
+
+difficulty: 2
+
+tags:
+  - anagram
+  - dictionary
+  - beam-search
+  - signature-index
+  - frequency-vector
+
+repo_url: "https://github.com/ipusiron/anagram-hunter"
+demo_url: "https://ipusiron.github.io/anagram-hunter/"
+
+hub: true
+---
+-->
+
 # Anagram Hunter - 高速アナグラム探索ツール
 
 ![GitHub Repo stars](https://img.shields.io/github/stars/ipusiron/anagram-hunter?style=social)
@@ -8,7 +44,7 @@
 
 **Day045 - 生成AIで作るセキュリティツール100**
 
-**Anagram Hunter**は、アナグラム（並べ替え語）を**辞書照合＋署名インデックス**で高速に抽出するWebツールです。
+**Anagram Hunter** は、アナグラム（並べ替え語）を **辞書照合＋署名インデックス** で高速に抽出するWebツールです。
 
 ---
 
@@ -20,9 +56,9 @@
 
 ## 📸 スクリーンショット
 
->![ダミー](assets/screenshot.png)
+>![アナグラム解読](assets/screenshot.png)
 >
->*ダミー*
+>*アナグラム解読*
 
 ---
 
