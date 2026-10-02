@@ -52,6 +52,10 @@
               aria-controls="panel-two-word" aria-selected="false" tabindex="-1">2語アナグラム</button>
       <button type="button" role="tab" id="tab-phrase" class="tab-btn" data-tab="phrase"
               aria-controls="panel-phrase" aria-selected="false" tabindex="-1">フレーズ</button>
+      <button type="button" role="tab" id="tab-builder" class="tab-btn" data-tab="builder"
+              aria-controls="panel-builder" aria-selected="false" tabindex="-1">組み立て</button>
+      <button type="button" role="tab" id="tab-compare" class="tab-btn" data-tab="compare"
+              aria-controls="panel-compare" aria-selected="false" tabindex="-1">比較</button>
       <button type="button" role="tab" id="tab-dictionary" class="tab-btn" data-tab="dictionary"
               aria-controls="panel-dictionary" aria-selected="false" tabindex="-1">辞書設定</button>
     </div>
@@ -286,6 +290,107 @@
                 <th scope="col">語数</th>
                 <th scope="col">語の長さ</th>
                 <th scope="col">辞書</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- 組み立て（1語ずつ選んで残りを詰める） -->
+    <section id="panel-builder" class="tab-content" role="tabpanel" aria-labelledby="tab-builder" hidden>
+      <form id="formBuilder" class="card" novalidate>
+        <h2>1) 入力</h2>
+        <div class="field">
+          <label for="lettersBuilder">文字列</label>
+          <input type="text" id="lettersBuilder" autocomplete="off" spellcheck="false" maxlength="400"
+                 placeholder="例: ANAGRAM HUNTER" aria-describedby="lettersBuilderHint">
+          <p class="hint" id="lettersBuilderHint">候補から1語ずつ選ぶと、その語の文字を除いた残りと、残りで作れる語に切り替わります。残りがなくなれば完成です。</p>
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label for="minLenBuilder">候補の最小の長さ</label>
+            <input type="number" id="minLenBuilder" min="1" max="100" value="3" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="limitBuilder">表示の上限（語）</label>
+            <input type="number" id="limitBuilder" min="1" max="10000" value="200" inputmode="numeric">
+          </div>
+        </div>
+        <div class="run-actions">
+          <div class="dict-indicator">辞書: <span id="dictNameBuilder" class="dict-name"></span></div>
+          <div class="search-row">
+            <button type="submit" id="runBuilderBtn" class="btn btn-primary">組み立てを始める</button>
+            <button type="button" id="clearBuilderBtn" class="btn btn-ghost">クリア</button>
+          </div>
+          <p id="statusBuilder" class="status" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+
+      <section class="card" aria-labelledby="resultHeadingBuilder">
+        <h2 id="resultHeadingBuilder">2) 組み立て</h2>
+        <div class="builder-state">
+          <p><span class="label">選んだ語:</span> <span id="builderChosen" class="builder-chosen"></span></p>
+          <p><span class="label">残りの文字:</span> <span id="builderRest" class="builder-rest"></span></p>
+          <ul id="builderTiles" class="letter-tiles" aria-label="残りの文字の個数"></ul>
+          <p id="builderDone" class="done-note" hidden></p>
+        </div>
+        <div class="result-actions">
+          <button type="button" id="builderUndoBtn" class="btn">1語戻す</button>
+          <button type="button" id="builderResetBtn" class="btn btn-ghost">最初から</button>
+          <span id="resultInfoBuilder" class="muted"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="resultTableBuilder">
+            <thead>
+              <tr>
+                <th scope="col">候補（押すと選ぶ）</th>
+                <th scope="col">長さ</th>
+                <th scope="col">選んだあとの残り</th>
+                <th scope="col">あと1語で完成する語</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- 比較（2つの文字列） -->
+    <section id="panel-compare" class="tab-content" role="tabpanel" aria-labelledby="tab-compare" hidden>
+      <form id="formCompare" class="card" novalidate>
+        <h2>1) 入力</h2>
+        <p>2つの文字列が互いのアナグラム（同じ文字を同じ数ずつ使う）かを比べます。辞書は使いません。</p>
+        <div class="field">
+          <label for="compareA">文字列A</label>
+          <input type="text" id="compareA" autocomplete="off" spellcheck="false" maxlength="400" placeholder="例: THE MORSE CODE">
+        </div>
+        <div class="field">
+          <label for="compareB">文字列B</label>
+          <input type="text" id="compareB" autocomplete="off" spellcheck="false" maxlength="400" placeholder="例: HERE COME DOTS">
+        </div>
+        <div class="run-actions">
+          <div class="search-row">
+            <button type="submit" id="runCompareBtn" class="btn btn-primary">比べる</button>
+            <button type="button" id="clearCompareBtn" class="btn btn-ghost">クリア</button>
+          </div>
+          <p id="statusCompare" class="status" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+
+      <section class="card" aria-labelledby="resultHeadingCompare">
+        <h2 id="resultHeadingCompare">2) 結果</h2>
+        <p id="compareVerdict" class="verdict"></p>
+        <p id="compareDetail" class="summary"></p>
+        <div class="table-wrap">
+          <table id="resultTableCompare">
+            <thead>
+              <tr>
+                <th scope="col">文字</th>
+                <th scope="col">Aの数</th>
+                <th scope="col">Bの数</th>
+                <th scope="col">差</th>
               </tr>
             </thead>
             <tbody></tbody>

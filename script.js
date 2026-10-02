@@ -4,7 +4,7 @@
 
 import {
   normalizeLetters, parseWordList, buildIndex, readFilters, findSingle, findPairs, findPhrases, signature, toCsv, MAX_INPUT_LETTERS,
-  PHRASE_LIMITS
+  PHRASE_LIMITS, removeWord, compareLetters, freqVector
 } from './js/anagram-core.js';
 import {
   BUILTIN_WORDS, BUNDLED_WORDLISTS, DEFAULT_WORDLISTS, MAX_FILE_BYTES, MAX_DICTIONARY_WORDS, displayName
@@ -12,6 +12,7 @@ import {
 import { t } from './js/messages.js';
 import { initThemeToggle } from './js/theme.js';
 import { initTabs } from './js/tabs.js';
+import { readParams } from './js/params.js';
 
 // ===== Utilities =====
 const $ = (sel) => document.querySelector(sel);
@@ -64,7 +65,7 @@ function rebuildIndex(focusKey = null) {
   const names = enabledSources().map((s) => s.name);
   const loading = sources.some((s) => s.loading);
   const text = names.length ? names.join(', ') : t('dict.none');
-  for (const node of [$('#dictNameSingle'), $('#dictNameTwoWord'), $('#dictNamePhrase')]) {
+  for (const node of [$('#dictNameSingle'), $('#dictNameTwoWord'), $('#dictNamePhrase'), $('#dictNameBuilder')]) {
     node.textContent = loading ? `${text} ${t('dict.loading')}` : text;
   }
   markStale();
@@ -175,22 +176,31 @@ function formatBytes(n) {
 }
 
 // ===== Search =====
+// 数の欄に数でない文字（1e など）を打つと、ブラウザーは value を空にして badInput を立てる。空欄（制限なし）と区別する
+function num(sel) {
+  return sel ? ($(sel).validity && $(sel).validity.badInput ? 'invalid' : $(sel).value) : '';
+}
+
+// 表示の上限。空欄は200、1〜MAX_LIMIT の整数でなければ NaN
+function readLimit(sel) {
+  const raw = String(num(sel)).trim();
+  const limit = raw === '' ? 200 : /^\d+$/.test(raw) ? Number(raw) : NaN;
+  return limit >= 1 && limit <= MAX_LIMIT ? limit : NaN;
+}
+
 // 入力欄から文字列・絞り込み・表示の上限を読む。誤りは { error } で返す
 function readForm(ids) {
   const { letters, ignored } = normalizeLetters($(ids.letters).value);
   if (!letters) return { error: t('input.empty') };
   if (letters.length > MAX_INPUT_LETTERS) return { error: t('input.tooLong', { n: letters.length, limit: MAX_INPUT_LETTERS }) };
-  // 数の欄に数でない文字（1e など）を打つと、ブラウザーは value を空にして badInput を立てる。空欄（制限なし）と区別する
-  const num = (sel) => ($(sel).validity && $(sel).validity.badInput ? 'invalid' : $(sel).value);
   const text = (sel) => (sel ? $(sel).value : '');
   const f = readFilters({
     minLen: num(ids.minLen), maxLen: num(ids.maxLen),
     startsWith: text(ids.startsWith), endsWith: text(ids.endsWith), contains: text(ids.contains), pattern: text(ids.pattern)
   });
   if (!f.ok) return { error: t(`filter.${f.error}`, f) };
-  const rawLimit = String(num(ids.limit)).trim();
-  const limit = rawLimit === '' ? 200 : /^\d+$/.test(rawLimit) ? Number(rawLimit) : NaN;
-  if (!(limit >= 1 && limit <= MAX_LIMIT)) return { error: t('limit.invalid', { limit: fmt(MAX_LIMIT) }) };
+  const limit = readLimit(ids.limit);
+  if (Number.isNaN(limit)) return { error: t('limit.invalid', { limit: fmt(MAX_LIMIT) }) };
   if (!index.words.length) return { error: t('search.noDictionary') };
   return { letters, ignored, filters: f.filters, limit };
 }
@@ -227,6 +237,8 @@ function markStale() {
     node.textContent = t('result.stale');
     node.hidden = false;
   }
+  // 組み立ては、選んだ語を保ったまま新しい辞書で候補を出し直す
+  if (builder.letters) renderBuilder();
 }
 
 function lookupLink(query) {
@@ -392,6 +404,132 @@ function renderPhrase() {
       : t('result.shownAll', { total: fmt(phrases.length) });
 }
 
+// ===== Builder（1語ずつ選んで残りを詰める） =====
+const builder = { letters: '', chosen: [], minLen: 3, limit: 200 };
+
+function builderRest() {
+  // 残りの文字は、選ぶ前から ABC 順（署名の形）で表す
+  return builder.chosen.reduce((rest, w) => removeWord(rest, w), signature(builder.letters));
+}
+
+function startBuilder() {
+  const status = $('#statusBuilder');
+  const { letters, ignored } = normalizeLetters($('#lettersBuilder').value);
+  const f = readFilters({ minLen: num('#minLenBuilder') });
+  const limit = readLimit('#limitBuilder');
+  let error = null;
+  if (!letters) error = t('input.empty');
+  else if (letters.length > MAX_INPUT_LETTERS) error = t('input.tooLong', { n: letters.length, limit: MAX_INPUT_LETTERS });
+  else if (!f.ok) error = t(`filter.${f.error}`, f);
+  else if (Number.isNaN(limit)) error = t('limit.invalid', { limit: fmt(MAX_LIMIT) });
+  else if (!index.words.length) error = t('search.noDictionary');
+  if (error) {
+    Object.assign(builder, { letters: '', chosen: [] });
+    renderBuilder();
+    return setStatus(status, error, true);
+  }
+  Object.assign(builder, { letters, chosen: [], minLen: f.filters.minLen, limit });
+  setStatus(status, ignored ? t('input.ignored', { n: ignored }) : '');
+  renderBuilder();
+}
+
+function renderBuilder(focusFirst = false) {
+  const tbody = $('#resultTableBuilder tbody');
+  tbody.replaceChildren();
+  const tiles = $('#builderTiles');
+  tiles.replaceChildren();
+  const done = $('#builderDone');
+  done.hidden = true;
+  $('#builderUndoBtn').disabled = !builder.chosen.length;
+  $('#builderResetBtn').disabled = !builder.chosen.length;
+  if (!builder.letters) {
+    $('#builderChosen').textContent = '';
+    $('#builderRest').textContent = '';
+    $('#resultInfoBuilder').textContent = '';
+    return;
+  }
+  const rest = builderRest();
+  $('#builderChosen').textContent = builder.chosen.length ? builder.chosen.join(' ') : t('builder.noneChosen');
+  $('#builderRest').textContent = rest ? t('builder.rest', { rest, n: rest.length }) : t('result.restNone');
+  freqVector(rest).forEach((n, i) => {
+    if (n) tiles.append(el('li', { class: 'letter-tile', text: t('builder.tile', { letter: String.fromCharCode(65 + i), n }) }));
+  });
+  if (!rest) {
+    done.textContent = t('builder.done', { phrase: builder.chosen.join(' ') });
+    done.hidden = false;
+    $('#resultInfoBuilder').textContent = '';
+    if (focusFirst) $('#builderUndoBtn').focus();
+    return;
+  }
+  const filters = readFilters({ minLen: String(builder.minLen) }).filters;
+  // 候補: 残りの文字で作れる語。残りを使い切る語、あと1語で完成する語、長い語の順
+  const rows = findSingle(index, rest, filters).map((r) => ({
+    ...r, finish: r.rest ? (index.bySignature.get(r.rest) || []).filter((w) => w.length >= builder.minLen) : []
+  }));
+  const rank = (r) => (r.kind === 'exact' ? 0 : r.finish.length ? 1 : 2);
+  rows.sort((a, b) => rank(a) - rank(b) || b.word.length - a.word.length || (a.word < b.word ? -1 : 1));
+  const shown = rows.slice(0, builder.limit);
+  const frag = document.createDocumentFragment();
+  for (const r of shown) {
+    const pick = el('button', { type: 'button', class: 'word-btn', text: r.word });
+    pick.dataset.word = r.word;
+    pick.setAttribute('aria-label', t('builder.pick', { word: r.word }));
+    const more = r.finish.length > 3 ? t('builder.more', { n: r.finish.length - 3 }) : '';
+    frag.append(el('tr', {}, [
+      el('td', {}, [pick]),
+      el('td', { text: String(r.word.length) }),
+      el('td', {}, [r.rest ? el('code', { text: r.rest }) : t('builder.completes')]),
+      el('td', { text: r.finish.slice(0, 3).join(', ') + more })
+    ]));
+  }
+  tbody.append(frag);
+  $('#resultInfoBuilder').textContent = rows.length === 0 ? t('builder.noCandidates')
+    : shown.length < rows.length ? t('result.shown', { total: fmt(rows.length), shown: fmt(shown.length) })
+      : t('result.shownAll', { total: fmt(rows.length) });
+  if (focusFirst) (tbody.querySelector('button') || $('#builderUndoBtn')).focus();
+}
+
+// ===== Compare（2つの文字列） =====
+function runCompare() {
+  const status = $('#statusCompare');
+  const r = compareLetters($('#compareA').value, $('#compareB').value);
+  const tbody = $('#resultTableCompare tbody');
+  tbody.replaceChildren();
+  const verdict = $('#compareVerdict');
+  if (!r.a.letters || !r.b.letters) {
+    verdict.textContent = '';
+    $('#compareDetail').textContent = '';
+    return setStatus(status, t('compare.empty'), true);
+  }
+  const ignored = r.a.ignored + r.b.ignored;
+  setStatus(status, ignored ? t('input.ignored', { n: ignored }) : '');
+  verdict.textContent = t(r.isAnagram ? 'compare.yes' : 'compare.no');
+  verdict.classList.toggle('ok', r.isAnagram);
+  const parts = [t('compare.signatures', { a: r.signatureA, b: r.signatureB, la: r.a.letters.length, lb: r.b.letters.length })];
+  const list = (items) => items.map((x) => t('builder.tile', { letter: x.letter, n: x.count })).join(t('compare.join'));
+  if (!r.isAnagram) {
+    if (r.onlyA.length) parts.push(t('compare.onlyA', { list: list(r.onlyA) }));
+    if (r.onlyB.length) parts.push(t('compare.onlyB', { list: list(r.onlyB) }));
+    if (r.aContainsB) parts.push(t('compare.aContainsB'));
+    else if (r.bContainsA) parts.push(t('compare.bContainsA'));
+  }
+  $('#compareDetail').textContent = parts.join(' ');
+  const va = freqVector(r.a.letters);
+  const vb = freqVector(r.b.letters);
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < 26; i++) {
+    if (!va[i] && !vb[i]) continue;
+    const d = va[i] - vb[i];
+    frag.append(el('tr', d ? { class: 'diff' } : {}, [
+      el('td', {}, [el('code', { text: String.fromCharCode(65 + i) })]),
+      el('td', { text: String(va[i]) }),
+      el('td', { text: String(vb[i]) }),
+      el('td', { text: d === 0 ? '0' : d > 0 ? t('compare.moreA', { n: d }) : t('compare.moreB', { n: -d }) })
+    ]));
+  }
+  tbody.append(frag);
+}
+
 // ===== Export =====
 function download(text, filename, type) {
   const url = URL.createObjectURL(new Blob([text], { type }));
@@ -472,6 +610,46 @@ function bindEvents() {
   $('#exportCsvPhraseBtn').addEventListener('click', () => exportRecords(phraseRecords(), 'phrase_anagram_results', 'csv', PHRASE.status));
   $('#exportJsonPhraseBtn').addEventListener('click', () => exportRecords(phraseRecords(), 'phrase_anagram_results', 'json', PHRASE.status));
 
+  $('#formBuilder').addEventListener('submit', (e) => {
+    e.preventDefault();
+    startBuilder();
+  });
+  $('#clearBuilderBtn').addEventListener('click', () => {
+    $('#lettersBuilder').value = '';
+    setStatus($('#statusBuilder'), '');
+    Object.assign(builder, { letters: '', chosen: [] });
+    renderBuilder();
+    $('#lettersBuilder').focus();
+  });
+  $('#resultTableBuilder').addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-word]');
+    if (!button || !builder.letters) return;
+    builder.chosen.push(button.dataset.word);
+    renderBuilder(true);
+  });
+  $('#builderUndoBtn').addEventListener('click', () => {
+    builder.chosen.pop();
+    renderBuilder(true);
+  });
+  $('#builderResetBtn').addEventListener('click', () => {
+    builder.chosen = [];
+    renderBuilder(true);
+  });
+
+  $('#formCompare').addEventListener('submit', (e) => {
+    e.preventDefault();
+    runCompare();
+  });
+  $('#clearCompareBtn').addEventListener('click', () => {
+    $('#compareA').value = '';
+    $('#compareB').value = '';
+    setStatus($('#statusCompare'), '');
+    $('#compareVerdict').textContent = '';
+    $('#compareDetail').textContent = '';
+    $('#resultTableCompare tbody').replaceChildren();
+    $('#compareA').focus();
+  });
+
   // 辞書の一覧（項目は描き直すので、親で受ける）
   $('#dictListContainer').addEventListener('change', (e) => {
     const key = e.target.dataset && e.target.dataset.key;
@@ -515,22 +693,43 @@ function bindEvents() {
 }
 
 // ===== Init =====
+// ?text=…&tab=… で渡された文字列を、そのタブの入力欄に入れて実行する（辞書の読み込みのあと）
+const PARAM_TARGETS = {
+  single: ['#letters', runSingle],
+  'two-word': ['#lettersTwoWord', runPair],
+  phrase: ['#lettersPhrase', runPhrase],
+  builder: ['#lettersBuilder', startBuilder],
+  compare: ['#compareA', runCompare]
+};
+
+function applyParams(tabs) {
+  const { text, tab } = readParams(window.location.search);
+  if (!text) return;
+  const [input, run] = PARAM_TARGETS[tab];
+  $(input).value = text;
+  tabs.select(tab);
+  if (tab !== 'compare') run();
+}
+
 async function init() {
   initThemeToggle($('#btnTheme'));
-  initTabs($('.tab-nav'));
+  const tabs = initTabs($('.tab-nav'));
   bindEvents();
   rebuildIndex();
+  renderBuilder();
   document.documentElement.setAttribute('data-ready', 'true');
   if (IS_FILE) {
     const note = $('#dictProtocolNote');
     note.textContent = t('dict.fileProtocol');
     note.hidden = false;
+    applyParams(tabs);
     return;
   }
   // 一般的な英単語の付属辞書を最初から読み込む
   const defaults = sources.filter((s) => s.kind === 'bundled' && DEFAULT_WORDLISTS.includes(s.id));
   await Promise.all(defaults.map((s) => loadBundled(s)));
   rebuildIndex();
+  applyParams(tabs);
 }
 
 init();

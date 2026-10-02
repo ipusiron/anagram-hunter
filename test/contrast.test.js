@@ -54,7 +54,7 @@ test('ダークの上書きは、明示の切り替えと OS の設定とで同�
 
 test('入力欄の文字は16px以上、操作の高さは44px以上', () => {
   assert.match(css, /textarea \{[^}]*font-size: 16px;/);
-  for (const sel of ['.btn {', '.tab-btn {', '.icon-btn {', '.check {', '.dict-checkbox {', '.dict-link {']) {
+  for (const sel of ['.btn {', '.tab-btn {', '.icon-btn {', '.check {', '.dict-checkbox {', '.dict-link {', '.word-btn {']) {
     const i = css.indexOf(sel);
     assert.ok(i >= 0, sel);
     const body = css.slice(i, css.indexOf('}', i));

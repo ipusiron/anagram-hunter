@@ -71,6 +71,27 @@ const JA = {
   'phrase.truncated.steps': '探索の手数が上限に達したので打ち切りました。語数の上限を減らす、各語の最小の長さを上げる、必ず含める語を指定する、のいずれかで範囲を狭めてください',
   'phrase.truncated.time': '探索に時間がかかりすぎたので打ち切りました。語数の上限を減らす、各語の最小の長さを上げる、必ず含める語を指定する、のいずれかで範囲を狭めてください',
   'export.nothing': '書き出す結果がありません',
+  // 組み立て
+  'builder.noneChosen': '（まだ選んでいません）',
+  'builder.rest': '{rest}（{n} 字）',
+  'builder.tile': '{letter}×{n}',
+  'builder.done': '完成: {phrase}',
+  'builder.pick': '{word} を選ぶ',
+  'builder.completes': '完成',
+  'builder.more': ' ほか {n} 語',
+  'builder.noCandidates': '残りの文字で作れる語がありません。「1語戻す」で選び直してください',
+  // 比較
+  'compare.empty': '文字列Aと文字列Bの両方に英字を入力してください',
+  'compare.yes': 'アナグラムです（同じ文字を同じ数ずつ使っています）',
+  'compare.no': 'アナグラムではありません',
+  'compare.signatures': '署名はA: {a}（{la} 字）、B: {b}（{lb} 字）。',
+  'compare.join': '、',
+  'compare.onlyA': 'Aにだけある文字: {list}。',
+  'compare.onlyB': 'Bにだけある文字: {list}。',
+  'compare.aContainsB': 'BはAの文字だけで作れます（Aの文字が余ります）。',
+  'compare.bContainsA': 'AはBの文字だけで作れます（Bの文字が余ります）。',
+  'compare.moreA': 'Aが {n} 多い',
+  'compare.moreB': 'Bが {n} 多い',
   // テーマ
   'theme.toDark': 'ダークモードに切り替える',
   'theme.toLight': 'ライトモードに切り替える'
