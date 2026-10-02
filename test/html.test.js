@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-const SCRIPTS = ['script.js', 'js/tabs.js', 'js/theme.js', 'js/theme-init.js', 'js/file-check.js'];
+const SCRIPTS = ['script.js', 'js/tabs.js', 'js/theme.js', 'js/theme-init.js', 'js/file-check.js', 'js/params.js'];
 
 test('CSP: インラインのスクリプト・スタイルを許さず、外部への送信先を持たない', () => {
   const m = html.match(/http-equiv="Content-Security-Policy"\s+content="([^"]+)"/);
@@ -48,14 +48,21 @@ test('画面の要素の id がそろっている（それぞれ1つだけ）', 
     'resultTableSingle', 'formTwoWord', 'lettersTwoWord', 'minLenTwoWord', 'maxLenTwoWord', 'startsWithTwoWord', 'endsWithTwoWord',
     'containsTwoWord', 'topN', 'dictNameTwoWord', 'runTwoWordBtn', 'clearTwoWordBtn', 'statusTwoWord', 'summaryTwoWord', 'staleTwoWord',
     'exportCsvTwoWordBtn', 'exportJsonTwoWordBtn', 'resultInfoTwoWord', 'resultTableTwoWord', 'dictProtocolNote', 'dictListContainer',
-    'dictStatus', 'wordCount', 'signatureCount', 'wordlistFile', 'loadWordlistBtn', 'pasteWords', 'addPastedBtn'];
+    'dictStatus', 'wordCount', 'signatureCount', 'wordlistFile', 'loadWordlistBtn', 'pasteWords', 'addPastedBtn',
+    'patternSingle', 'tab-phrase', 'panel-phrase', 'formPhrase', 'lettersPhrase', 'maxWordsPhrase', 'minLenPhrase', 'maxLenPhrase',
+    'includePhrase', 'excludePhrase', 'limitPhrase', 'allowRepeatPhrase', 'dictNamePhrase', 'runPhraseBtn', 'clearPhraseBtn', 'statusPhrase',
+    'summaryPhrase', 'truncatedPhrase', 'stalePhrase', 'exportCsvPhraseBtn', 'exportJsonPhraseBtn', 'resultInfoPhrase', 'resultTablePhrase',
+    'tab-builder', 'panel-builder', 'formBuilder', 'lettersBuilder', 'minLenBuilder', 'limitBuilder', 'dictNameBuilder', 'runBuilderBtn',
+    'clearBuilderBtn', 'statusBuilder', 'builderChosen', 'builderRest', 'builderTiles', 'builderDone', 'builderUndoBtn', 'builderResetBtn',
+    'resultInfoBuilder', 'resultTableBuilder', 'tab-compare', 'panel-compare', 'formCompare', 'compareA', 'compareB', 'runCompareBtn',
+    'clearCompareBtn', 'statusCompare', 'compareVerdict', 'compareDetail', 'resultTableCompare'];
   for (const id of ids) assert.equal(html.split(`id="${id}"`).length - 1, 1, id);
 });
 
 test('タブは role=tablist／tab／tabpanel の組で、aria-controls と aria-labelledby が対応する', () => {
-  assert.match(html, /<div class="tab-nav" role="tablist" aria-label="[^"]+">/);
+  assert.match(html, /<div class="tab-nav" role="tablist" aria-label="[^"]+"[^>]*>/);
   const tabs = [...html.matchAll(/<button type="button" role="tab" id="(tab-[\w-]+)"[^>]*\s+aria-controls="(panel-[\w-]+)" aria-selected="(true|false)"/g)];
-  assert.equal(tabs.length, 3);
+  assert.equal(tabs.length, 6);
   assert.equal(tabs.filter((m) => m[3] === 'true').length, 1);
   for (const [, tab, panel] of tabs) {
     assert.match(html, new RegExp(`<section id="${panel}" class="tab-content" role="tabpanel" aria-labelledby="${tab}"`));
@@ -64,13 +71,13 @@ test('タブは role=tablist／tab／tabpanel の組で、aria-controls と aria
 
 test('ボタンには type、入力欄にはラベル、外部リンクには noopener noreferrer、状態の表示は aria-live', () => {
   for (const m of html.matchAll(/<button\b[^>]*>/g)) assert.match(m[0], /type="(button|submit)"/, m[0]);
-  for (const m of html.matchAll(/<(input|textarea)\b[^>]*id="([^"]+)"/g)) {
+  for (const m of html.matchAll(/<(input|textarea|select)\b[^>]*id="([^"]+)"/g)) {
     if (m[0].includes('type="checkbox"')) continue;
-    assert.match(html, new RegExp(`<label for="${m[2]}">`), m[2]);
+    assert.match(html, new RegExp(`<label for="${m[2]}"[ >]`), m[2]);
   }
   for (const m of html.matchAll(/<a\b[^>]*href="https?:[^"]*"[^>]*>/g)) assert.match(m[0], /rel="noopener noreferrer"/, m[0]);
   assert.match(read('script.js'), /rel: 'noopener noreferrer'/);
-  for (const id of ['statusSingle', 'statusTwoWord', 'dictStatus']) {
+  for (const id of ['statusSingle', 'statusTwoWord', 'statusPhrase', 'statusBuilder', 'statusCompare', 'dictStatus']) {
     assert.match(html, new RegExp(`id="${id}" class="status" role="status" aria-live="polite"`), id);
   }
 });

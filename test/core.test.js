@@ -59,9 +59,9 @@ test('内蔵ミニ辞書は19語・6署名（重複なし）', () => {
 });
 
 test('絞り込みの条件: 空欄は制限なし、数でない値・範囲外・最小＞最大は誤り', () => {
-  assert.deepEqual(readFilters({}), { ok: true, filters: { minLen: 1, maxLen: MAX_WORD_LENGTH, startsWith: '', endsWith: '', contains: '' } });
+  assert.deepEqual(readFilters({}), { ok: true, filters: { minLen: 1, maxLen: MAX_WORD_LENGTH, startsWith: '', endsWith: '', contains: '', pattern: '' } });
   assert.deepEqual(readFilters({ minLen: ' 3 ', maxLen: '5', startsWith: '^s', endsWith: 'ｔ$', contains: 'é' }).filters,
-    { minLen: 3, maxLen: 5, startsWith: 'S', endsWith: 'T', contains: 'E' });
+    { minLen: 3, maxLen: 5, startsWith: 'S', endsWith: 'T', contains: 'E', pattern: '' });
   assert.equal(readFilters({ minLen: '0' }).error, 'minLen');
   assert.equal(readFilters({ minLen: '-1' }).error, 'minLen');
   assert.equal(readFilters({ minLen: '2.5' }).error, 'minLen');

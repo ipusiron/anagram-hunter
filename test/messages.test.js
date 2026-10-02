@@ -5,7 +5,7 @@ import { MESSAGES, t, setLanguage, getLanguage } from '../js/messages.js';
 import { BUNDLED_WORDLISTS } from '../js/wordlists.js';
 
 const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-const LOGIC = ['script.js', 'js/anagram-core.js', 'js/wordlists.js', 'js/tabs.js', 'js/theme.js'];
+const LOGIC = ['script.js', 'js/anagram-core.js', 'js/wordlists.js', 'js/tabs.js', 'js/theme.js', 'js/params.js'];
 // かな・カタカナ・漢字（記号の定数はエスケープ表記で書くので、ここに当たるのは文言だけ）
 const JAPANESE = new RegExp('[\\u3040-\\u30ff\\u3400-\\u9fff]');
 const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
@@ -22,7 +22,8 @@ test('script.js が使うキーは、すべて日本語の辞書にある', () =
   const src = read('script.js');
   const keys = new Set([...src.matchAll(/\bt\('([\w.]+)'/g)].map((m) => m[1]));
   // テンプレートで組み立てるキー
-  for (const k of ['kind.exact', 'kind.partial', 'filter.minLen', 'filter.maxLen', 'filter.range']) keys.add(k);
+  for (const k of ['kind.exact', 'kind.partial', 'filter.minLen', 'filter.maxLen', 'filter.range', 'filter.pattern',
+    'phrase.includeNotInInput', 'phrase.truncated.results', 'phrase.truncated.steps', 'phrase.truncated.time']) keys.add(k);
   for (const w of BUNDLED_WORDLISTS) keys.add(`dict.bundled.${w.id}`);
   for (const k of keys) assert.ok(k in MESSAGES.ja, k);
   assert.ok(keys.size > 30);

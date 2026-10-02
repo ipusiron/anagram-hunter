@@ -54,10 +54,18 @@ test('ダークの上書きは、明示の切り替えと OS の設定とで同�
 
 test('入力欄の文字は16px以上、操作の高さは44px以上', () => {
   assert.match(css, /textarea \{[^}]*font-size: 16px;/);
-  for (const sel of ['.btn {', '.tab-btn {', '.icon-btn {', '.check {', '.dict-checkbox {', '.dict-link {']) {
+  for (const sel of ['.btn {', '.tab-btn {', '.icon-btn {', '.check {', '.dict-checkbox {', '.dict-link {', '.word-btn {']) {
     const i = css.indexOf(sel);
     assert.ok(i >= 0, sel);
     const body = css.slice(i, css.indexOf('}', i));
     assert.match(body, /min-height: 44px;/, sel);
   }
+});
+
+test('ヘッダーのボタン（言語・テーマ）は高さを固定し、並びの容器に引き伸ばされない', () => {
+  const body = css.slice(css.indexOf('.icon-btn {'), css.indexOf('}', css.indexOf('.icon-btn {')));
+  assert.match(body, /^\s+height: 44px;$/m);
+  assert.match(body, /flex: none;/);
+  assert.match(body, /white-space: nowrap;/);
+  assert.match(css, /\.header-actions \{ display: flex; align-items: center;/);
 });
