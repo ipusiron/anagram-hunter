@@ -212,6 +212,7 @@ code {
 
 input[type="number"],
 input[type="text"],
+select,
 textarea {
   width: 100%;
   min-height: 44px;
@@ -225,7 +226,9 @@ textarea {
 }
 
 #letters,
-#lettersTwoWord { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; letter-spacing: 0.04em; }
+#lettersTwoWord,
+#lettersPhrase,
+#patternSingle { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; letter-spacing: 0.04em; }
 
 textarea { resize: vertical; min-height: 96px; }
 

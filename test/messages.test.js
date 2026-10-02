@@ -22,7 +22,8 @@ test('script.js が使うキーは、すべて日本語の辞書にある', () =
   const src = read('script.js');
   const keys = new Set([...src.matchAll(/\bt\('([\w.]+)'/g)].map((m) => m[1]));
   // テンプレートで組み立てるキー
-  for (const k of ['kind.exact', 'kind.partial', 'filter.minLen', 'filter.maxLen', 'filter.range']) keys.add(k);
+  for (const k of ['kind.exact', 'kind.partial', 'filter.minLen', 'filter.maxLen', 'filter.range', 'filter.pattern',
+    'phrase.includeNotInInput', 'phrase.truncated.results', 'phrase.truncated.steps', 'phrase.truncated.time']) keys.add(k);
   for (const w of BUNDLED_WORDLISTS) keys.add(`dict.bundled.${w.id}`);
   for (const k of keys) assert.ok(k in MESSAGES.ja, k);
   assert.ok(keys.size > 30);

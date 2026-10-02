@@ -46,6 +46,7 @@ const JA = {
   'filter.minLen': '最小の長さは 1〜{limit} の整数で入力してください',
   'filter.maxLen': '最大の長さは 1〜{limit} の整数で入力するか、空欄にしてください',
   'filter.range': '最小の長さ（{min}）が最大の長さ（{max}）より大きくなっています',
+  'filter.pattern': '位置の指定は、英字と ?（どの文字でもよい1字）で入力してください',
   'limit.invalid': '表示の上限は 1〜{limit} の整数で入力してください',
   'search.noDictionary': '使う辞書がありません。「辞書設定」で辞書を選んでください',
   // 結果
@@ -61,6 +62,14 @@ const JA = {
   'result.none': '見つかりませんでした',
   'result.stale': '辞書が変わったため、この結果は前の辞書で探したものです。もう一度「探索」を押すと新しい辞書で探します',
   'result.pairLengths': '{a}＋{b}',
+  'result.lengthJoin': '＋',
+  'result.phraseSummary': '{letters}（{len} 字、署名 {sig}）: {n} 組。候補の語 {candidates} 語、探索の手数 {steps}',
+  'phrase.searching': '探索中…',
+  'phrase.includeNotInInput': '必ず含める語「{word}」は、入力の文字から作れません',
+  'phrase.truncated.results': '結果が {limit} 組に達したので、そこで探索を打ち切りました。長い語を使う組から探すので、短い語の多い組は出ていない可能性があります。'
+    + '語数の上限を減らすか、各語の最小の長さを上げると絞り込めます',
+  'phrase.truncated.steps': '探索の手数が上限に達したので打ち切りました。語数の上限を減らす、各語の最小の長さを上げる、必ず含める語を指定する、のいずれかで範囲を狭めてください',
+  'phrase.truncated.time': '探索に時間がかかりすぎたので打ち切りました。語数の上限を減らす、各語の最小の長さを上げる、必ず含める語を指定する、のいずれかで範囲を狭めてください',
   'export.nothing': '書き出す結果がありません',
   // テーマ
   'theme.toDark': 'ダークモードに切り替える',

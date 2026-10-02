@@ -3,7 +3,8 @@
 // 画面の処理（ES module）。探索のロジックは js/anagram-core.js、辞書の一覧は js/wordlists.js、文言は js/messages.js
 
 import {
-  normalizeLetters, parseWordList, buildIndex, readFilters, findSingle, findPairs, signature, toCsv, MAX_INPUT_LETTERS
+  normalizeLetters, parseWordList, buildIndex, readFilters, findSingle, findPairs, findPhrases, signature, toCsv, MAX_INPUT_LETTERS,
+  PHRASE_LIMITS
 } from './js/anagram-core.js';
 import {
   BUILTIN_WORDS, BUNDLED_WORDLISTS, DEFAULT_WORDLISTS, MAX_FILE_BYTES, MAX_DICTIONARY_WORDS, displayName
@@ -16,6 +17,8 @@ import { initTabs } from './js/tabs.js';
 const $ = (sel) => document.querySelector(sel);
 const fmt = (n) => Number(n).toLocaleString();
 const MAX_LIMIT = 10000;
+// フレーズの探索を打ち切るまでの時間（ミリ秒）
+const PHRASE_TIME_MS = 3000;
 const IS_FILE = window.location.protocol === 'file:';
 
 function el(tag, props = {}, children = []) {
@@ -61,7 +64,9 @@ function rebuildIndex(focusKey = null) {
   const names = enabledSources().map((s) => s.name);
   const loading = sources.some((s) => s.loading);
   const text = names.length ? names.join(', ') : t('dict.none');
-  for (const node of [$('#dictNameSingle'), $('#dictNameTwoWord')]) node.textContent = loading ? `${text} ${t('dict.loading')}` : text;
+  for (const node of [$('#dictNameSingle'), $('#dictNameTwoWord'), $('#dictNamePhrase')]) {
+    node.textContent = loading ? `${text} ${t('dict.loading')}` : text;
+  }
   markStale();
   renderDictionaryList(focusKey);
 }
@@ -177,9 +182,10 @@ function readForm(ids) {
   if (letters.length > MAX_INPUT_LETTERS) return { error: t('input.tooLong', { n: letters.length, limit: MAX_INPUT_LETTERS }) };
   // 数の欄に数でない文字（1e など）を打つと、ブラウザーは value を空にして badInput を立てる。空欄（制限なし）と区別する
   const num = (sel) => ($(sel).validity && $(sel).validity.badInput ? 'invalid' : $(sel).value);
+  const text = (sel) => (sel ? $(sel).value : '');
   const f = readFilters({
     minLen: num(ids.minLen), maxLen: num(ids.maxLen),
-    startsWith: $(ids.startsWith).value, endsWith: $(ids.endsWith).value, contains: $(ids.contains).value
+    startsWith: text(ids.startsWith), endsWith: text(ids.endsWith), contains: text(ids.contains), pattern: text(ids.pattern)
   });
   if (!f.ok) return { error: t(`filter.${f.error}`, f) };
   const rawLimit = String(num(ids.limit)).trim();
@@ -191,7 +197,7 @@ function readForm(ids) {
 
 const SINGLE = {
   letters: '#letters', minLen: '#minLen', maxLen: '#maxLen', startsWith: '#startsWith', endsWith: '#endsWith', contains: '#contains',
-  limit: '#limitSingle', status: '#statusSingle', summary: '#summarySingle', stale: '#staleSingle', info: '#resultInfoSingle',
+  pattern: '#patternSingle', limit: '#limitSingle', status: '#statusSingle', summary: '#summarySingle', stale: '#staleSingle', info: '#resultInfoSingle',
   tbody: '#resultTableSingle tbody'
 };
 const PAIR = {
@@ -199,7 +205,11 @@ const PAIR = {
   endsWith: '#endsWithTwoWord', contains: '#containsTwoWord', limit: '#topN', status: '#statusTwoWord', summary: '#summaryTwoWord',
   stale: '#staleTwoWord', info: '#resultInfoTwoWord', tbody: '#resultTableTwoWord tbody'
 };
-const state = { single: null, pair: null };
+const PHRASE = {
+  letters: '#lettersPhrase', minLen: '#minLenPhrase', maxLen: '#maxLenPhrase', limit: '#limitPhrase', status: '#statusPhrase',
+  summary: '#summaryPhrase', stale: '#stalePhrase', info: '#resultInfoPhrase', tbody: '#resultTablePhrase tbody'
+};
+const state = { single: null, pair: null, phrase: null };
 
 function clearResults(ids, key) {
   state[key] = null;
@@ -211,7 +221,7 @@ function clearResults(ids, key) {
 
 // 辞書が変わったら、表示中の結果に「前の辞書の結果」と添える
 function markStale() {
-  for (const [key, ids] of [['single', SINGLE], ['pair', PAIR]]) {
+  for (const [key, ids] of [['single', SINGLE], ['pair', PAIR], ['phrase', PHRASE]]) {
     if (!state[key]) continue;
     const node = $(ids.stale);
     node.textContent = t('result.stale');
@@ -315,6 +325,73 @@ function renderPair() {
       : t('result.shownAll', { total: fmt(pairs.length) });
 }
 
+// 必ず含める語・使わない語の欄: 空白か「,」「、」で区切り、英字だけに直す
+function readWordList(sel) {
+  return $(sel).value.split(/[\s,\u3001\uff0c]+/).map((w) => normalizeLetters(w).letters).filter(Boolean);
+}
+
+function runPhrase() {
+  const status = $(PHRASE.status);
+  const form = readForm(PHRASE);
+  if (form.error) {
+    clearResults(PHRASE, 'phrase');
+    $('#truncatedPhrase').hidden = true;
+    return setStatus(status, form.error, true);
+  }
+  setStatus(status, t('phrase.searching'));
+  $('#runPhraseBtn').disabled = true;
+  // 「探索中」を画面に出してから探す（長い入力では数秒かかることがある）
+  setTimeout(() => {
+    try {
+      const r = findPhrases(index, form.letters, form.filters, {
+        maxWords: Number($('#maxWordsPhrase').value), include: readWordList('#includePhrase'), exclude: readWordList('#excludePhrase'),
+        allowRepeat: $('#allowRepeatPhrase').checked, limit: PHRASE_LIMITS.results, steps: PHRASE_LIMITS.steps, timeMs: PHRASE_TIME_MS
+      });
+      if (!r.ok) {
+        clearResults(PHRASE, 'phrase');
+        $('#truncatedPhrase').hidden = true;
+        return setStatus(status, t(`phrase.${r.error}`, r), true);
+      }
+      state.phrase = { ...form, phrases: r.phrases };
+      $(PHRASE.stale).hidden = true;
+      $(PHRASE.summary).textContent = t('result.phraseSummary', {
+        letters: form.letters, len: form.letters.length, sig: signature(form.letters), n: fmt(r.phrases.length),
+        candidates: fmt(r.candidates), steps: fmt(r.steps)
+      });
+      const note = $('#truncatedPhrase');
+      note.hidden = !r.truncated;
+      note.textContent = r.truncated ? t(`phrase.truncated.${r.truncated}`, { limit: fmt(PHRASE_LIMITS.results) }) : '';
+      setStatus(status, form.ignored ? t('input.ignored', { n: form.ignored }) : '');
+      renderPhrase();
+    } finally {
+      $('#runPhraseBtn').disabled = false;
+    }
+  }, 0);
+}
+
+function renderPhrase() {
+  const tbody = $(PHRASE.tbody);
+  tbody.replaceChildren();
+  if (!state.phrase) return;
+  const { phrases, limit } = state.phrase;
+  const shown = phrases.slice(0, limit);
+  const frag = document.createDocumentFragment();
+  shown.forEach((p, i) => {
+    const phrase = p.words.join(' ');
+    frag.append(el('tr', {}, [
+      el('td', { text: String(i + 1) }),
+      el('td', {}, [el('code', { text: phrase })]),
+      el('td', { text: String(p.words.length) }),
+      el('td', { text: p.words.map((w) => w.length).join(t('result.lengthJoin')) }),
+      el('td', {}, [lookupLink(phrase)])
+    ]));
+  });
+  tbody.append(frag);
+  $(PHRASE.info).textContent = phrases.length === 0 ? t('result.none')
+    : shown.length < phrases.length ? t('result.shown', { total: fmt(phrases.length), shown: fmt(shown.length) })
+      : t('result.shownAll', { total: fmt(phrases.length) });
+}
+
 // ===== Export =====
 function download(text, filename, type) {
   const url = URL.createObjectURL(new Blob([text], { type }));
@@ -333,6 +410,12 @@ function singleRecords() {
 function pairRecords() {
   return (state.pair ? state.pair.pairs : []).map((p, i) => ({
     rank: i + 1, candidate: p.words.join(' '), word1: p.words[0], word2: p.words[1], length: p.length
+  }));
+}
+
+function phraseRecords() {
+  return (state.phrase ? state.phrase.phrases : []).map((p, i) => ({
+    rank: i + 1, candidate: p.words.join(' '), words: p.words.length, lengths: p.words.map((w) => w.length).join('+')
   }));
 }
 
@@ -374,6 +457,20 @@ function bindEvents() {
   });
   $('#exportCsvTwoWordBtn').addEventListener('click', () => exportRecords(pairRecords(), 'two_word_anagram_results', 'csv', PAIR.status));
   $('#exportJsonTwoWordBtn').addEventListener('click', () => exportRecords(pairRecords(), 'two_word_anagram_results', 'json', PAIR.status));
+
+  $('#formPhrase').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!$('#runPhraseBtn').disabled) runPhrase();
+  });
+  $('#clearPhraseBtn').addEventListener('click', () => {
+    $('#lettersPhrase').value = '';
+    setStatus($(PHRASE.status), '');
+    clearResults(PHRASE, 'phrase');
+    $('#truncatedPhrase').hidden = true;
+    $('#lettersPhrase').focus();
+  });
+  $('#exportCsvPhraseBtn').addEventListener('click', () => exportRecords(phraseRecords(), 'phrase_anagram_results', 'csv', PHRASE.status));
+  $('#exportJsonPhraseBtn').addEventListener('click', () => exportRecords(phraseRecords(), 'phrase_anagram_results', 'json', PHRASE.status));
 
   // 辞書の一覧（項目は描き直すので、親で受ける）
   $('#dictListContainer').addEventListener('change', (e) => {

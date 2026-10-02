@@ -7,7 +7,7 @@
         content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <title>Anagram Hunter</title>
-  <meta name="description" content="Anagram Hunter: 辞書の署名で1語・2語のアナグラムを探す、ブラウザーの中だけで動くツール">
+  <meta name="description" content="Anagram Hunter: 辞書の署名で1語・2語・フレーズのアナグラムを探す、ブラウザーの中だけで動くツール">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <script src="js/theme-init.js"></script>
   <script src="js/file-check.js" defer></script>
@@ -36,7 +36,7 @@
       <div class="header-side" aria-hidden="true"></div>
       <div class="hero">
         <h1>Anagram Hunter</h1>
-        <p class="subtitle">辞書の署名で1語・2語のアナグラムを探す（入力も辞書もブラウザーの外へ送りません）</p>
+        <p class="subtitle">辞書の署名で1語・2語・フレーズのアナグラムを探す（入力も辞書もブラウザーの外へ送りません）</p>
       </div>
       <div class="header-side header-actions">
         <button type="button" id="btnTheme" class="icon-btn" aria-label="ダークモードに切り替える">🌙</button>
@@ -50,6 +50,8 @@
               aria-controls="panel-single" aria-selected="true">単語アナグラム</button>
       <button type="button" role="tab" id="tab-two-word" class="tab-btn" data-tab="two-word"
               aria-controls="panel-two-word" aria-selected="false" tabindex="-1">2語アナグラム</button>
+      <button type="button" role="tab" id="tab-phrase" class="tab-btn" data-tab="phrase"
+              aria-controls="panel-phrase" aria-selected="false" tabindex="-1">フレーズ</button>
       <button type="button" role="tab" id="tab-dictionary" class="tab-btn" data-tab="dictionary"
               aria-controls="panel-dictionary" aria-selected="false" tabindex="-1">辞書設定</button>
     </div>
@@ -84,6 +86,12 @@
           <div class="field">
             <label for="contains">含む文字列</label>
             <input type="text" id="contains" autocomplete="off" spellcheck="false" placeholder="例: ST">
+          </div>
+          <div class="field">
+            <label for="patternSingle">位置の指定</label>
+            <input type="text" id="patternSingle" autocomplete="off" spellcheck="false" placeholder="例: S?L???"
+                   aria-describedby="patternSingleHint">
+            <p class="hint" id="patternSingleHint">? はどの文字でもよい1字（S?L??? は6字で、1字目がS・3字目がL）</p>
           </div>
           <div class="field">
             <label for="limitSingle">表示の上限（件）</label>
@@ -192,6 +200,90 @@
               <tr>
                 <th scope="col">#</th>
                 <th scope="col">候補（2語）</th>
+                <th scope="col">語の長さ</th>
+                <th scope="col">辞書</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- フレーズ（3語以上） -->
+    <section id="panel-phrase" class="tab-content" role="tabpanel" aria-labelledby="tab-phrase" hidden>
+      <form id="formPhrase" class="card" novalidate>
+        <h2>1) 入力</h2>
+        <div class="field">
+          <label for="lettersPhrase">文字列</label>
+          <input type="text" id="lettersPhrase" autocomplete="off" spellcheck="false" maxlength="400"
+                 placeholder="例: ELEVEN PLUS TWO" aria-describedby="lettersPhraseHint">
+          <p class="hint" id="lettersPhraseHint">入力の文字をちょうど使い切る、何語かの組（フレーズ）を探します。語の順だけが違う組は1つにまとめます。</p>
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label for="maxWordsPhrase">語数の上限</label>
+            <select id="maxWordsPhrase">
+              <option value="2">2語</option>
+              <option value="3" selected>3語</option>
+              <option value="4">4語</option>
+              <option value="5">5語</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="minLenPhrase">各語の最小の長さ</label>
+            <input type="number" id="minLenPhrase" min="1" max="100" value="3" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="maxLenPhrase">各語の最大の長さ</label>
+            <input type="number" id="maxLenPhrase" min="1" max="100" inputmode="numeric" placeholder="制限なし">
+          </div>
+          <div class="field">
+            <label for="includePhrase">必ず含める語</label>
+            <input type="text" id="includePhrase" autocomplete="off" spellcheck="false" placeholder="例: TWELVE"
+                   aria-describedby="includePhraseHint">
+            <p class="hint" id="includePhraseHint">空白か「,」で区切って複数指定できます</p>
+          </div>
+          <div class="field">
+            <label for="excludePhrase">使わない語</label>
+            <input type="text" id="excludePhrase" autocomplete="off" spellcheck="false" placeholder="例: SOUP, SUN">
+          </div>
+          <div class="field">
+            <label for="limitPhrase">表示の上限（組）</label>
+            <input type="number" id="limitPhrase" min="1" max="10000" value="200" inputmode="numeric">
+          </div>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="allowRepeatPhrase">
+          同じ語を2回以上使う組も探す
+        </label>
+        <div class="run-actions">
+          <div class="dict-indicator">辞書: <span id="dictNamePhrase" class="dict-name"></span></div>
+          <div class="search-row">
+            <button type="submit" id="runPhraseBtn" class="btn btn-primary">フレーズを探索</button>
+            <button type="button" id="clearPhraseBtn" class="btn btn-ghost">クリア</button>
+          </div>
+          <p id="statusPhrase" class="status" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+
+      <section class="card" aria-labelledby="resultHeadingPhrase">
+        <h2 id="resultHeadingPhrase">2) 結果</h2>
+        <p id="summaryPhrase" class="summary"></p>
+        <p id="truncatedPhrase" class="stale-note" hidden></p>
+        <p id="stalePhrase" class="stale-note" hidden></p>
+        <div class="result-actions">
+          <button type="button" id="exportCsvPhraseBtn" class="btn btn-ghost">CSVで保存</button>
+          <button type="button" id="exportJsonPhraseBtn" class="btn btn-ghost">JSONで保存</button>
+          <span id="resultInfoPhrase" class="muted"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="resultTablePhrase">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">候補</th>
+                <th scope="col">語数</th>
                 <th scope="col">語の長さ</th>
                 <th scope="col">辞書</th>
               </tr>
