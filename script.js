@@ -10,7 +10,8 @@ import {
   BUILTIN_WORDS, BUNDLED_WORDLISTS, DEFAULT_WORDLISTS, MAX_FILE_BYTES, MAX_DICTIONARY_WORDS, displayName
 } from './js/wordlists.js';
 import { t } from './js/messages.js';
-import { initThemeToggle } from './js/theme.js';
+import { initThemeToggle, refreshThemeButton } from './js/theme.js';
+import { initialLanguage, saveLanguage, useLanguage } from './js/i18n.js';
 import { initTabs } from './js/tabs.js';
 import { readParams } from './js/params.js';
 
@@ -43,12 +44,19 @@ function setStatus(node, text, isError = false) {
 // kind: builtin（内蔵）／bundled（付属、fetch で読む）／file（ファイル選択）／paste（貼り付け）
 // words は正規化と重複除去のあとの配列。bundled は読み込むまで null
 const sources = [
-  { key: 'builtin', kind: 'builtin', name: t('dict.builtin'), words: BUILTIN_WORDS, lines: BUILTIN_WORDS.length, duplicates: 0, invalid: 0,
-    enabled: true }
+  { key: 'builtin', kind: 'builtin', words: BUILTIN_WORDS, lines: BUILTIN_WORDS.length, duplicates: 0, invalid: 0, enabled: true }
 ];
 for (const w of BUNDLED_WORDLISTS) {
-  sources.push({ key: `bundled:${w.id}`, kind: 'bundled', id: w.id, file: w.file, name: t(`dict.bundled.${w.id}`), words: null,
-    expected: w.words, lines: w.lines, enabled: false, loading: false });
+  sources.push({ key: `bundled:${w.id}`, kind: 'bundled', id: w.id, file: w.file, words: null, expected: w.words, lines: w.lines,
+    enabled: false, loading: false });
+}
+
+// 辞書名。内蔵・付属・貼り付けは今の言語の文言、ファイルはファイル名
+function nameOf(s) {
+  if (s.kind === 'builtin') return t('dict.builtin');
+  if (s.kind === 'bundled') return t(`dict.bundled.${s.id}`);
+  if (s.kind === 'paste') return t('dict.pasted', { n: s.pasteNo });
+  return s.name;
 }
 let pasteCount = 0;
 let userCount = 0;
@@ -62,13 +70,18 @@ function rebuildIndex(focusKey = null) {
   index = buildIndex(enabledSources().map((s) => s.words));
   $('#wordCount').textContent = fmt(index.words.length);
   $('#signatureCount').textContent = fmt(index.bySignature.size);
-  const names = enabledSources().map((s) => s.name);
+  markStale();
+  refreshDictionaryLabels(focusKey);
+}
+
+// 探索ボタンの上の「辞書:」の表示と、辞書の一覧（言語を切り替えたときもここで描き直す）
+function refreshDictionaryLabels(focusKey = null) {
+  const names = enabledSources().map(nameOf);
   const loading = sources.some((s) => s.loading);
   const text = names.length ? names.join(', ') : t('dict.none');
   for (const node of [$('#dictNameSingle'), $('#dictNameTwoWord'), $('#dictNamePhrase'), $('#dictNameBuilder')]) {
     node.textContent = loading ? `${text} ${t('dict.loading')}` : text;
   }
-  markStale();
   renderDictionaryList(focusKey);
 }
 
@@ -99,7 +112,7 @@ function renderDictionaryList(focusKey = null) {
     else if (!s.words) count = t('dict.notLoaded', { n: fmt(s.expected) });
     else if (s.kind === 'builtin') count = t('dict.words', { n: fmt(s.words.length) });
     else count = wordCountText(s);
-    const label = el('label', { class: 'dict-checkbox' }, [box, el('span', { class: 'dict-item-name', text: s.name })]);
+    const label = el('label', { class: 'dict-checkbox' }, [box, el('span', { class: 'dict-item-name', text: nameOf(s) })]);
     const item = el('li', { class: 'dict-item' }, [
       label,
       el('span', { class: 'dict-item-kind', text: kindLabel(s) }),
@@ -108,7 +121,7 @@ function renderDictionaryList(focusKey = null) {
     if (s.kind === 'file' || s.kind === 'paste') {
       const remove = el('button', { type: 'button', class: 'btn btn-ghost btn-small', text: t('dict.remove') });
       remove.dataset.remove = s.key;
-      remove.setAttribute('aria-label', t('dict.removeLabel', { name: s.name }));
+      remove.setAttribute('aria-label', t('dict.removeLabel', { name: nameOf(s) }));
       item.append(remove);
     }
     list.append(item);
@@ -130,7 +143,7 @@ async function loadBundled(source) {
     return true;
   } catch (e) {
     source.enabled = false;
-    setStatus($('#dictStatus'), t('dict.errorFetch', { name: source.name, detail: e.message }), true);
+    setStatus($('#dictStatus'), t('dict.errorFetch', { name: nameOf(source), detail: e.message }), true);
     return false;
   } finally {
     source.loading = false;
@@ -143,7 +156,7 @@ async function toggleSource(key, on) {
   if (on && !s.words && s.kind === 'bundled') {
     const ok = await loadBundled(s);
     rebuildIndex(key);
-    if (ok) setStatus($('#dictStatus'), t('dict.statusLoaded', { name: s.name, n: fmt(s.words.length), total: fmt(index.words.length) }));
+    if (ok) setStatus($('#dictStatus'), t('dict.statusLoaded', { name: nameOf(s), n: fmt(s.words.length), total: fmt(index.words.length) }));
     return;
   }
   s.enabled = on;
@@ -152,7 +165,7 @@ async function toggleSource(key, on) {
 }
 
 // 利用者の辞書を足す。同じ名前があれば中身を置き換える（使う／使わないの状態は引き継ぐ）
-function addUserDictionary(kind, name, text) {
+function addUserDictionary(kind, name, text, extra = {}) {
   const parsed = parseWordList(text);
   if (!parsed.words.length) return setStatus($('#dictStatus'), t('dict.errorEmpty'), true);
   if (parsed.words.length > MAX_DICTIONARY_WORDS) {
@@ -164,7 +177,7 @@ function addUserDictionary(kind, name, text) {
     Object.assign(existing, fields);
   } else {
     userCount += 1;
-    sources.push({ key: `${kind}:${userCount}`, kind, name, enabled: true, ...fields });
+    sources.push({ key: `${kind}:${userCount}`, kind, name, enabled: true, ...extra, ...fields });
   }
   rebuildIndex();
   const msg = existing ? 'dict.statusReplaced' : 'dict.statusLoaded';
@@ -242,7 +255,8 @@ function markStale() {
 }
 
 function lookupLink(query) {
-  const a = el('a', { href: `https://eow.alc.co.jp/search?q=${encodeURIComponent(query)}`, target: '_blank', rel: 'noopener noreferrer',
+  // 日本語の画面は英辞郎、英語の画面は Wiktionary（URL の形は messages.js）
+  const a = el('a', { href: t('result.lookupUrl', { q: encodeURIComponent(query.toLowerCase()) }), target: '_blank', rel: 'noopener noreferrer',
     class: 'dict-link', text: '🔍' });
   a.setAttribute('aria-label', t('result.lookup', { word: query }));
   a.title = t('result.lookup', { word: query });
@@ -257,14 +271,21 @@ function runSingle() {
     return setStatus(status, form.error, true);
   }
   const results = findSingle(index, form.letters, form.filters);
-  state.single = { ...form, results };
-  $(SINGLE.stale).hidden = true;
   const exact = results.filter((r) => r.kind === 'exact').length;
-  $(SINGLE.summary).textContent = t('result.singleSummary', {
-    letters: form.letters, len: form.letters.length, sig: signature(form.letters), exact: fmt(exact), partial: fmt(results.length - exact)
-  });
+  // 要約は文言のキーと値で持ち、表示のたびに今の言語で組み立てる
+  const summary = ['result.singleSummary', {
+    letters: form.letters, len: form.letters.length, sig: signature(form.letters), exact, partial: results.length - exact
+  }];
+  state.single = { ...form, results, summary };
+  $(SINGLE.stale).hidden = true;
   setStatus(status, form.ignored ? t('input.ignored', { n: form.ignored }) : '');
   renderSingle();
+}
+
+// 要約のキーと値から文にする（数は桁区切りで）
+function summaryText([key, values]) {
+  const shown = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, typeof v === 'number' ? fmt(v) : v]));
+  return t(key, shown);
 }
 
 function visibleSingle() {
@@ -276,6 +297,7 @@ function renderSingle() {
   const tbody = $(SINGLE.tbody);
   tbody.replaceChildren();
   if (!state.single) return;
+  $(SINGLE.summary).textContent = summaryText(state.single.summary);
   const rows = visibleSingle();
   const shown = rows.slice(0, state.single.limit);
   const frag = document.createDocumentFragment();
@@ -306,11 +328,11 @@ function runPair() {
     return setStatus(status, form.error, true);
   }
   const { pairs, firstCandidates } = findPairs(index, form.letters, form.filters);
-  state.pair = { ...form, pairs };
+  const summary = ['result.pairSummary', {
+    letters: form.letters, len: form.letters.length, sig: signature(form.letters), pairs: pairs.length, first: firstCandidates
+  }];
+  state.pair = { ...form, pairs, summary };
   $(PAIR.stale).hidden = true;
-  $(PAIR.summary).textContent = t('result.pairSummary', {
-    letters: form.letters, len: form.letters.length, sig: signature(form.letters), pairs: fmt(pairs.length), first: fmt(firstCandidates)
-  });
   setStatus(status, form.ignored ? t('input.ignored', { n: form.ignored }) : '');
   renderPair();
 }
@@ -319,6 +341,7 @@ function renderPair() {
   const tbody = $(PAIR.tbody);
   tbody.replaceChildren();
   if (!state.pair) return;
+  $(PAIR.summary).textContent = summaryText(state.pair.summary);
   const { pairs, limit } = state.pair;
   const shown = pairs.slice(0, limit);
   const frag = document.createDocumentFragment();
@@ -364,15 +387,11 @@ function runPhrase() {
         $('#truncatedPhrase').hidden = true;
         return setStatus(status, t(`phrase.${r.error}`, r), true);
       }
-      state.phrase = { ...form, phrases: r.phrases };
+      const summary = ['result.phraseSummary', {
+        letters: form.letters, len: form.letters.length, sig: signature(form.letters), n: r.phrases.length, candidates: r.candidates, steps: r.steps
+      }];
+      state.phrase = { ...form, phrases: r.phrases, summary, truncated: r.truncated };
       $(PHRASE.stale).hidden = true;
-      $(PHRASE.summary).textContent = t('result.phraseSummary', {
-        letters: form.letters, len: form.letters.length, sig: signature(form.letters), n: fmt(r.phrases.length),
-        candidates: fmt(r.candidates), steps: fmt(r.steps)
-      });
-      const note = $('#truncatedPhrase');
-      note.hidden = !r.truncated;
-      note.textContent = r.truncated ? t(`phrase.truncated.${r.truncated}`, { limit: fmt(PHRASE_LIMITS.results) }) : '';
       setStatus(status, form.ignored ? t('input.ignored', { n: form.ignored }) : '');
       renderPhrase();
     } finally {
@@ -384,7 +403,11 @@ function runPhrase() {
 function renderPhrase() {
   const tbody = $(PHRASE.tbody);
   tbody.replaceChildren();
+  const note = $('#truncatedPhrase');
+  note.hidden = !(state.phrase && state.phrase.truncated);
   if (!state.phrase) return;
+  $(PHRASE.summary).textContent = summaryText(state.phrase.summary);
+  note.textContent = state.phrase.truncated ? t(`phrase.truncated.${state.phrase.truncated}`, { limit: fmt(PHRASE_LIMITS.results) }) : '';
   const { phrases, limit } = state.phrase;
   const shown = phrases.slice(0, limit);
   const frag = document.createDocumentFragment();
@@ -665,7 +688,7 @@ function bindEvents() {
     // 外した項目の位置にある項目（なければ1つ前）へフォーカスを移す
     const next = sources[Math.min(i, sources.length - 1)];
     if (next) renderDictionaryList(next.key);
-    setStatus($('#dictStatus'), t('dict.statusRemoved', { name: removed.name, total: fmt(index.words.length) }));
+    setStatus($('#dictStatus'), t('dict.statusRemoved', { name: nameOf(removed), total: fmt(index.words.length) }));
   });
 
   $('#loadWordlistBtn').addEventListener('click', async () => {
@@ -687,7 +710,7 @@ function bindEvents() {
     const area = $('#pasteWords');
     if (!area.value.trim()) return setStatus($('#dictStatus'), t('dict.errorPasteEmpty'), true);
     pasteCount += 1;
-    addUserDictionary('paste', t('dict.pasted', { n: pasteCount }), area.value);
+    addUserDictionary('paste', t('dict.pasted', { n: pasteCount }), area.value, { pasteNo: pasteCount });
     area.value = '';
   });
 }
@@ -711,7 +734,28 @@ function applyParams(tabs) {
   if (tab !== 'compare') run();
 }
 
+// 言語を切り替える: 静的な文言、テーマのボタン、辞書名、表示中の結果と組み立てを今の言語で描き直す（状態の表示は消す）
+function switchLanguage(lang) {
+  useLanguage(lang);
+  refreshThemeButton($('#btnTheme'));
+  refreshDictionaryLabels();
+  for (const sel of ['#statusSingle', '#statusTwoWord', '#statusPhrase', '#statusBuilder', '#statusCompare', '#dictStatus']) setStatus($(sel), '');
+  if (IS_FILE) $('#dictProtocolNote').textContent = t('dict.fileProtocol');
+  for (const sel of ['#staleSingle', '#staleTwoWord', '#stalePhrase']) $(sel).textContent = t('result.stale');
+  renderSingle();
+  renderPair();
+  renderPhrase();
+  renderBuilder();
+  if ($('#compareVerdict').textContent) runCompare();
+}
+
 async function init() {
+  useLanguage(initialLanguage());
+  $('#btnLang').addEventListener('click', () => {
+    const next = document.documentElement.lang === 'ja' ? 'en' : 'ja';
+    switchLanguage(next);
+    saveLanguage(next);
+  });
   initThemeToggle($('#btnTheme'));
   const tabs = initTabs($('.tab-nav'));
   bindEvents();

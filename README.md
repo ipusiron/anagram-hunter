@@ -200,6 +200,7 @@ anagram-hunter/
 ├── js/                       # 画面以外のモジュール
 │   ├── anagram-core.js       # 探索のロジック（正規化・署名・1語・2語・CSV）
 │   ├── file-check.js         # file://で起動できなかったときの案内
+│   ├── i18n.js               # 画面の言語（日本語・英語）の決定と切り替え
 │   ├── messages.js           # 画面に出す文言
 │   ├── params.js             # URLの?text=・?tab=で入力を受け取る
 │   ├── tabs.js               # タブの切り替え（キーボード操作を含む）
@@ -211,6 +212,7 @@ anagram-hunter/
 │   ├── core.test.js          # 正規化・署名・絞り込み・1語・2語・CSV
 │   ├── format.test.js        # 行の長さ・制御文字・行数の下限
 │   ├── html.test.js          # CSP・要素のid・タブの役割・ラベル
+│   ├── i18n.test.js          # 日英の辞書のキー・英語に日本語がないこと・初期の言語
 │   ├── messages.test.js      # 文言の置き場所とキー
 │   ├── params.test.js        # ?text=・?tab=の読み取り
 │   ├── phrase.test.js        # フレーズ・位置の指定・2つの比較・大きい辞書

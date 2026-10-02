@@ -129,7 +129,8 @@ code {
 
 @media (min-width: 769px) {
   .header-inner {
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    /* 左右の列はボタン2つぶん（言語・テーマ）を確保し、中央のタイトルは720pxまでで折り返す */
+    grid-template-columns: minmax(136px, 1fr) minmax(0, 720px) minmax(136px, 1fr);
     align-items: center;
   }
   .header-side[aria-hidden="true"] { display: block; }
@@ -147,6 +148,8 @@ code {
   cursor: pointer;
 }
 .icon-btn:hover { border-color: var(--accent); }
+.header-actions { display: flex; gap: 8px; }
+.lang-btn { padding: 0 12px; font-size: 15px; font-weight: 700; white-space: nowrap; }
 
 .container { max-width: 1100px; margin: 16px auto 48px; padding: 0 16px; }
 

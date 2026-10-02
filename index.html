@@ -36,93 +36,95 @@
       <div class="header-side" aria-hidden="true"></div>
       <div class="hero">
         <h1>Anagram Hunter</h1>
-        <p class="subtitle">辞書の署名で1語・2語・フレーズのアナグラムを探す（入力も辞書もブラウザーの外へ送りません）</p>
+        <p class="subtitle" data-i18n="ui.subtitle">辞書の署名で1語・2語・フレーズのアナグラムを探す（入力も辞書もブラウザーの外へ送りません）</p>
       </div>
       <div class="header-side header-actions">
+        <button type="button" id="btnLang" class="icon-btn lang-btn" data-i18n="ui.langButton"
+                data-i18n-attr="aria-label:ui.switchLang;title:ui.switchLang" aria-label="Switch to English" title="Switch to English">EN</button>
         <button type="button" id="btnTheme" class="icon-btn" aria-label="ダークモードに切り替える">🌙</button>
       </div>
     </div>
   </header>
 
   <main class="container">
-    <div class="tab-nav" role="tablist" aria-label="機能の切り替え">
+    <div class="tab-nav" role="tablist" aria-label="機能の切り替え" data-i18n-attr="aria-label:ui.tabsLabel">
       <button type="button" role="tab" id="tab-single" class="tab-btn active" data-tab="single"
-              aria-controls="panel-single" aria-selected="true">単語アナグラム</button>
+              aria-controls="panel-single" aria-selected="true" data-i18n="ui.tabSingle">単語アナグラム</button>
       <button type="button" role="tab" id="tab-two-word" class="tab-btn" data-tab="two-word"
-              aria-controls="panel-two-word" aria-selected="false" tabindex="-1">2語アナグラム</button>
+              aria-controls="panel-two-word" aria-selected="false" tabindex="-1" data-i18n="ui.tabPair">2語アナグラム</button>
       <button type="button" role="tab" id="tab-phrase" class="tab-btn" data-tab="phrase"
-              aria-controls="panel-phrase" aria-selected="false" tabindex="-1">フレーズ</button>
+              aria-controls="panel-phrase" aria-selected="false" tabindex="-1" data-i18n="ui.tabPhrase">フレーズ</button>
       <button type="button" role="tab" id="tab-builder" class="tab-btn" data-tab="builder"
-              aria-controls="panel-builder" aria-selected="false" tabindex="-1">組み立て</button>
+              aria-controls="panel-builder" aria-selected="false" tabindex="-1" data-i18n="ui.tabBuilder">組み立て</button>
       <button type="button" role="tab" id="tab-compare" class="tab-btn" data-tab="compare"
-              aria-controls="panel-compare" aria-selected="false" tabindex="-1">比較</button>
+              aria-controls="panel-compare" aria-selected="false" tabindex="-1" data-i18n="ui.tabCompare">比較</button>
       <button type="button" role="tab" id="tab-dictionary" class="tab-btn" data-tab="dictionary"
-              aria-controls="panel-dictionary" aria-selected="false" tabindex="-1">辞書設定</button>
+              aria-controls="panel-dictionary" aria-selected="false" tabindex="-1" data-i18n="ui.tabDictionary">辞書設定</button>
     </div>
 
     <!-- 単語アナグラム -->
     <section id="panel-single" class="tab-content" role="tabpanel" aria-labelledby="tab-single">
       <form id="formSingle" class="card" novalidate>
-        <h2>1) 入力</h2>
+        <h2 data-i18n="ui.input">1) 入力</h2>
         <div class="field">
-          <label for="letters">文字列</label>
+          <label for="letters" data-i18n="ui.letters">文字列</label>
           <input type="text" id="letters" autocomplete="off" spellcheck="false" maxlength="400"
-                 placeholder="例: LISTEN" aria-describedby="lettersHint">
-          <p class="hint" id="lettersHint">英字だけを使います。全角英字やアクセント記号つきの字も使え、空白・数字・記号は無視します。</p>
+                 placeholder="例: LISTEN" aria-describedby="lettersHint" data-i18n-attr="placeholder:ph.letters">
+          <p class="hint" id="lettersHint" data-i18n="ui.lettersHint">英字だけを使います。全角英字やアクセント記号つきの字も使え、空白・数字・記号は無視します。</p>
         </div>
         <div class="field-grid">
           <div class="field">
-            <label for="minLen">最小の長さ</label>
+            <label for="minLen" data-i18n="ui.minLen">最小の長さ</label>
             <input type="number" id="minLen" min="1" max="100" value="2" inputmode="numeric">
           </div>
           <div class="field">
-            <label for="maxLen">最大の長さ</label>
-            <input type="number" id="maxLen" min="1" max="100" inputmode="numeric" placeholder="制限なし">
+            <label for="maxLen" data-i18n="ui.maxLen">最大の長さ</label>
+            <input type="number" id="maxLen" min="1" max="100" inputmode="numeric" placeholder="制限なし" data-i18n-attr="placeholder:ph.noLimit">
           </div>
           <div class="field">
-            <label for="startsWith">先頭の文字列</label>
-            <input type="text" id="startsWith" autocomplete="off" spellcheck="false" placeholder="例: S">
+            <label for="startsWith" data-i18n="ui.startsWith">先頭の文字列</label>
+            <input type="text" id="startsWith" autocomplete="off" spellcheck="false" placeholder="例: S" data-i18n-attr="placeholder:ph.s">
           </div>
           <div class="field">
-            <label for="endsWith">末尾の文字列</label>
-            <input type="text" id="endsWith" autocomplete="off" spellcheck="false" placeholder="例: ING">
+            <label for="endsWith" data-i18n="ui.endsWith">末尾の文字列</label>
+            <input type="text" id="endsWith" autocomplete="off" spellcheck="false" placeholder="例: ING" data-i18n-attr="placeholder:ph.ing">
           </div>
           <div class="field">
-            <label for="contains">含む文字列</label>
-            <input type="text" id="contains" autocomplete="off" spellcheck="false" placeholder="例: ST">
+            <label for="contains" data-i18n="ui.contains">含む文字列</label>
+            <input type="text" id="contains" autocomplete="off" spellcheck="false" placeholder="例: ST" data-i18n-attr="placeholder:ph.st">
           </div>
           <div class="field">
-            <label for="patternSingle">位置の指定</label>
+            <label for="patternSingle" data-i18n="ui.pattern">位置の指定</label>
             <input type="text" id="patternSingle" autocomplete="off" spellcheck="false" placeholder="例: S?L???"
-                   aria-describedby="patternSingleHint">
-            <p class="hint" id="patternSingleHint">? はどの文字でもよい1字（S?L??? は6字で、1字目がS・3字目がL）</p>
+                   aria-describedby="patternSingleHint" data-i18n-attr="placeholder:ph.pattern">
+            <p class="hint" id="patternSingleHint" data-i18n="ui.patternHint">? はどの文字でもよい1字（S?L??? は6字で、1字目がS・3字目がL）</p>
           </div>
           <div class="field">
-            <label for="limitSingle">表示の上限（件）</label>
+            <label for="limitSingle" data-i18n="ui.limitItems">表示の上限（件）</label>
             <input type="number" id="limitSingle" min="1" max="10000" value="200" inputmode="numeric">
           </div>
         </div>
         <div class="run-actions">
-          <div class="dict-indicator">辞書: <span id="dictNameSingle" class="dict-name"></span></div>
+          <div class="dict-indicator"><span data-i18n="ui.dictLabel">辞書:</span> <span id="dictNameSingle" class="dict-name"></span></div>
           <div class="search-row">
-            <button type="submit" id="runSingleBtn" class="btn btn-primary">探索</button>
-            <button type="button" id="clearBtn" class="btn btn-ghost">クリア</button>
+            <button type="submit" id="runSingleBtn" class="btn btn-primary" data-i18n="ui.search">探索</button>
+            <button type="button" id="clearBtn" class="btn btn-ghost" data-i18n="ui.clear">クリア</button>
           </div>
           <p id="statusSingle" class="status" role="status" aria-live="polite"></p>
         </div>
       </form>
 
       <section class="card" aria-labelledby="resultHeadingSingle">
-        <h2 id="resultHeadingSingle">2) 結果</h2>
+        <h2 id="resultHeadingSingle" data-i18n="ui.results">2) 結果</h2>
         <p id="summarySingle" class="summary"></p>
         <p id="staleSingle" class="stale-note" hidden></p>
         <div class="result-actions">
           <label class="check">
             <input type="checkbox" id="showPartialSingle">
-            一部の文字だけを使う語も表示
+            <span data-i18n="ui.showPartial">一部の文字だけを使う語も表示</span>
           </label>
-          <button type="button" id="exportCsvSingleBtn" class="btn btn-ghost">CSVで保存</button>
-          <button type="button" id="exportJsonSingleBtn" class="btn btn-ghost">JSONで保存</button>
+          <button type="button" id="exportCsvSingleBtn" class="btn btn-ghost" data-i18n="ui.saveCsv">CSVで保存</button>
+          <button type="button" id="exportJsonSingleBtn" class="btn btn-ghost" data-i18n="ui.saveJson">JSONで保存</button>
           <span id="resultInfoSingle" class="muted"></span>
         </div>
         <div class="table-wrap">
@@ -130,11 +132,11 @@
             <thead>
               <tr>
                 <th scope="col">#</th>
-                <th scope="col">候補</th>
-                <th scope="col">種類</th>
-                <th scope="col">長さ</th>
-                <th scope="col">残りの文字</th>
-                <th scope="col">辞書</th>
+                <th scope="col" data-i18n="ui.colCandidate">候補</th>
+                <th scope="col" data-i18n="ui.colKind">種類</th>
+                <th scope="col" data-i18n="ui.colLength">長さ</th>
+                <th scope="col" data-i18n="ui.colRest">残りの文字</th>
+                <th scope="col" data-i18n="ui.colLookup">辞書</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -146,56 +148,56 @@
     <!-- 2語アナグラム -->
     <section id="panel-two-word" class="tab-content" role="tabpanel" aria-labelledby="tab-two-word" hidden>
       <form id="formTwoWord" class="card" novalidate>
-        <h2>1) 入力</h2>
+        <h2 data-i18n="ui.input">1) 入力</h2>
         <div class="field">
-          <label for="lettersTwoWord">文字列</label>
+          <label for="lettersTwoWord" data-i18n="ui.letters">文字列</label>
           <input type="text" id="lettersTwoWord" autocomplete="off" spellcheck="false" maxlength="400"
-                 placeholder="例: DORMITORY" aria-describedby="lettersTwoWordHint">
-          <p class="hint" id="lettersTwoWordHint">入力の文字をちょうど使い切る2語の組を、すべて探します。</p>
+                 placeholder="例: DORMITORY" aria-describedby="lettersTwoWordHint" data-i18n-attr="placeholder:ph.dormitory">
+          <p class="hint" id="lettersTwoWordHint" data-i18n="ui.pairHint">入力の文字をちょうど使い切る2語の組を、すべて探します。</p>
         </div>
         <div class="field-grid">
           <div class="field">
-            <label for="minLenTwoWord">各語の最小の長さ</label>
+            <label for="minLenTwoWord" data-i18n="ui.minLenEach">各語の最小の長さ</label>
             <input type="number" id="minLenTwoWord" min="1" max="100" value="2" inputmode="numeric">
           </div>
           <div class="field">
-            <label for="maxLenTwoWord">各語の最大の長さ</label>
-            <input type="number" id="maxLenTwoWord" min="1" max="100" inputmode="numeric" placeholder="制限なし">
+            <label for="maxLenTwoWord" data-i18n="ui.maxLenEach">各語の最大の長さ</label>
+            <input type="number" id="maxLenTwoWord" min="1" max="100" inputmode="numeric" placeholder="制限なし" data-i18n-attr="placeholder:ph.noLimit">
           </div>
           <div class="field">
-            <label for="startsWithTwoWord">各語の先頭の文字列</label>
-            <input type="text" id="startsWithTwoWord" autocomplete="off" spellcheck="false" placeholder="例: S">
+            <label for="startsWithTwoWord" data-i18n="ui.startsWithEach">各語の先頭の文字列</label>
+            <input type="text" id="startsWithTwoWord" autocomplete="off" spellcheck="false" placeholder="例: S" data-i18n-attr="placeholder:ph.s">
           </div>
           <div class="field">
-            <label for="endsWithTwoWord">各語の末尾の文字列</label>
-            <input type="text" id="endsWithTwoWord" autocomplete="off" spellcheck="false" placeholder="例: ING">
+            <label for="endsWithTwoWord" data-i18n="ui.endsWithEach">各語の末尾の文字列</label>
+            <input type="text" id="endsWithTwoWord" autocomplete="off" spellcheck="false" placeholder="例: ING" data-i18n-attr="placeholder:ph.ing">
           </div>
           <div class="field">
-            <label for="containsTwoWord">各語が含む文字列</label>
-            <input type="text" id="containsTwoWord" autocomplete="off" spellcheck="false" placeholder="例: ST">
+            <label for="containsTwoWord" data-i18n="ui.containsEach">各語が含む文字列</label>
+            <input type="text" id="containsTwoWord" autocomplete="off" spellcheck="false" placeholder="例: ST" data-i18n-attr="placeholder:ph.st">
           </div>
           <div class="field">
-            <label for="topN">表示の上限（組）</label>
+            <label for="topN" data-i18n="ui.limitSets">表示の上限（組）</label>
             <input type="number" id="topN" min="1" max="10000" value="200" inputmode="numeric">
           </div>
         </div>
         <div class="run-actions">
-          <div class="dict-indicator">辞書: <span id="dictNameTwoWord" class="dict-name"></span></div>
+          <div class="dict-indicator"><span data-i18n="ui.dictLabel">辞書:</span> <span id="dictNameTwoWord" class="dict-name"></span></div>
           <div class="search-row">
-            <button type="submit" id="runTwoWordBtn" class="btn btn-primary">2語を探索</button>
-            <button type="button" id="clearTwoWordBtn" class="btn btn-ghost">クリア</button>
+            <button type="submit" id="runTwoWordBtn" class="btn btn-primary" data-i18n="ui.searchPairs">2語を探索</button>
+            <button type="button" id="clearTwoWordBtn" class="btn btn-ghost" data-i18n="ui.clear">クリア</button>
           </div>
           <p id="statusTwoWord" class="status" role="status" aria-live="polite"></p>
         </div>
       </form>
 
       <section class="card" aria-labelledby="resultHeadingTwoWord">
-        <h2 id="resultHeadingTwoWord">2) 結果</h2>
+        <h2 id="resultHeadingTwoWord" data-i18n="ui.results">2) 結果</h2>
         <p id="summaryTwoWord" class="summary"></p>
         <p id="staleTwoWord" class="stale-note" hidden></p>
         <div class="result-actions">
-          <button type="button" id="exportCsvTwoWordBtn" class="btn btn-ghost">CSVで保存</button>
-          <button type="button" id="exportJsonTwoWordBtn" class="btn btn-ghost">JSONで保存</button>
+          <button type="button" id="exportCsvTwoWordBtn" class="btn btn-ghost" data-i18n="ui.saveCsv">CSVで保存</button>
+          <button type="button" id="exportJsonTwoWordBtn" class="btn btn-ghost" data-i18n="ui.saveJson">JSONで保存</button>
           <span id="resultInfoTwoWord" class="muted"></span>
         </div>
         <div class="table-wrap">
@@ -203,9 +205,9 @@
             <thead>
               <tr>
                 <th scope="col">#</th>
-                <th scope="col">候補（2語）</th>
-                <th scope="col">語の長さ</th>
-                <th scope="col">辞書</th>
+                <th scope="col" data-i18n="ui.colPair">候補（2語）</th>
+                <th scope="col" data-i18n="ui.colLengths">語の長さ</th>
+                <th scope="col" data-i18n="ui.colLookup">辞書</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -217,68 +219,68 @@
     <!-- フレーズ（3語以上） -->
     <section id="panel-phrase" class="tab-content" role="tabpanel" aria-labelledby="tab-phrase" hidden>
       <form id="formPhrase" class="card" novalidate>
-        <h2>1) 入力</h2>
+        <h2 data-i18n="ui.input">1) 入力</h2>
         <div class="field">
-          <label for="lettersPhrase">文字列</label>
+          <label for="lettersPhrase" data-i18n="ui.letters">文字列</label>
           <input type="text" id="lettersPhrase" autocomplete="off" spellcheck="false" maxlength="400"
-                 placeholder="例: ELEVEN PLUS TWO" aria-describedby="lettersPhraseHint">
-          <p class="hint" id="lettersPhraseHint">入力の文字をちょうど使い切る、何語かの組（フレーズ）を探します。語の順だけが違う組は1つにまとめます。</p>
+                 placeholder="例: ELEVEN PLUS TWO" aria-describedby="lettersPhraseHint" data-i18n-attr="placeholder:ph.eleven">
+          <p class="hint" id="lettersPhraseHint" data-i18n="ui.phraseHint">入力の文字をちょうど使い切る、何語かの組（フレーズ）を探します。語の順だけが違う組は1つにまとめます。</p>
         </div>
         <div class="field-grid">
           <div class="field">
-            <label for="maxWordsPhrase">語数の上限</label>
+            <label for="maxWordsPhrase" data-i18n="ui.maxWords">語数の上限</label>
             <select id="maxWordsPhrase">
-              <option value="2">2語</option>
-              <option value="3" selected>3語</option>
-              <option value="4">4語</option>
-              <option value="5">5語</option>
+              <option value="2" data-i18n="ui.words2">2語</option>
+              <option value="3" selected data-i18n="ui.words3">3語</option>
+              <option value="4" data-i18n="ui.words4">4語</option>
+              <option value="5" data-i18n="ui.words5">5語</option>
             </select>
           </div>
           <div class="field">
-            <label for="minLenPhrase">各語の最小の長さ</label>
+            <label for="minLenPhrase" data-i18n="ui.minLenEach">各語の最小の長さ</label>
             <input type="number" id="minLenPhrase" min="1" max="100" value="3" inputmode="numeric">
           </div>
           <div class="field">
-            <label for="maxLenPhrase">各語の最大の長さ</label>
-            <input type="number" id="maxLenPhrase" min="1" max="100" inputmode="numeric" placeholder="制限なし">
+            <label for="maxLenPhrase" data-i18n="ui.maxLenEach">各語の最大の長さ</label>
+            <input type="number" id="maxLenPhrase" min="1" max="100" inputmode="numeric" placeholder="制限なし" data-i18n-attr="placeholder:ph.noLimit">
           </div>
           <div class="field">
-            <label for="includePhrase">必ず含める語</label>
+            <label for="includePhrase" data-i18n="ui.include">必ず含める語</label>
             <input type="text" id="includePhrase" autocomplete="off" spellcheck="false" placeholder="例: TWELVE"
-                   aria-describedby="includePhraseHint">
-            <p class="hint" id="includePhraseHint">空白か「,」で区切って複数指定できます</p>
+                   aria-describedby="includePhraseHint" data-i18n-attr="placeholder:ph.twelve">
+            <p class="hint" id="includePhraseHint" data-i18n="ui.includeHint">空白か「,」で区切って複数指定できます</p>
           </div>
           <div class="field">
-            <label for="excludePhrase">使わない語</label>
-            <input type="text" id="excludePhrase" autocomplete="off" spellcheck="false" placeholder="例: SOUP, SUN">
+            <label for="excludePhrase" data-i18n="ui.exclude">使わない語</label>
+            <input type="text" id="excludePhrase" autocomplete="off" spellcheck="false" placeholder="例: SOUP, SUN" data-i18n-attr="placeholder:ph.soup">
           </div>
           <div class="field">
-            <label for="limitPhrase">表示の上限（組）</label>
+            <label for="limitPhrase" data-i18n="ui.limitSets">表示の上限（組）</label>
             <input type="number" id="limitPhrase" min="1" max="10000" value="200" inputmode="numeric">
           </div>
         </div>
         <label class="check">
           <input type="checkbox" id="allowRepeatPhrase">
-          同じ語を2回以上使う組も探す
+          <span data-i18n="ui.allowRepeat">同じ語を2回以上使う組も探す</span>
         </label>
         <div class="run-actions">
-          <div class="dict-indicator">辞書: <span id="dictNamePhrase" class="dict-name"></span></div>
+          <div class="dict-indicator"><span data-i18n="ui.dictLabel">辞書:</span> <span id="dictNamePhrase" class="dict-name"></span></div>
           <div class="search-row">
-            <button type="submit" id="runPhraseBtn" class="btn btn-primary">フレーズを探索</button>
-            <button type="button" id="clearPhraseBtn" class="btn btn-ghost">クリア</button>
+            <button type="submit" id="runPhraseBtn" class="btn btn-primary" data-i18n="ui.searchPhrase">フレーズを探索</button>
+            <button type="button" id="clearPhraseBtn" class="btn btn-ghost" data-i18n="ui.clear">クリア</button>
           </div>
           <p id="statusPhrase" class="status" role="status" aria-live="polite"></p>
         </div>
       </form>
 
       <section class="card" aria-labelledby="resultHeadingPhrase">
-        <h2 id="resultHeadingPhrase">2) 結果</h2>
+        <h2 id="resultHeadingPhrase" data-i18n="ui.results">2) 結果</h2>
         <p id="summaryPhrase" class="summary"></p>
         <p id="truncatedPhrase" class="stale-note" hidden></p>
         <p id="stalePhrase" class="stale-note" hidden></p>
         <div class="result-actions">
-          <button type="button" id="exportCsvPhraseBtn" class="btn btn-ghost">CSVで保存</button>
-          <button type="button" id="exportJsonPhraseBtn" class="btn btn-ghost">JSONで保存</button>
+          <button type="button" id="exportCsvPhraseBtn" class="btn btn-ghost" data-i18n="ui.saveCsv">CSVで保存</button>
+          <button type="button" id="exportJsonPhraseBtn" class="btn btn-ghost" data-i18n="ui.saveJson">JSONで保存</button>
           <span id="resultInfoPhrase" class="muted"></span>
         </div>
         <div class="table-wrap">
@@ -286,10 +288,10 @@
             <thead>
               <tr>
                 <th scope="col">#</th>
-                <th scope="col">候補</th>
-                <th scope="col">語数</th>
-                <th scope="col">語の長さ</th>
-                <th scope="col">辞書</th>
+                <th scope="col" data-i18n="ui.colCandidate">候補</th>
+                <th scope="col" data-i18n="ui.colWords">語数</th>
+                <th scope="col" data-i18n="ui.colLengths">語の長さ</th>
+                <th scope="col" data-i18n="ui.colLookup">辞書</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -301,54 +303,54 @@
     <!-- 組み立て（1語ずつ選んで残りを詰める） -->
     <section id="panel-builder" class="tab-content" role="tabpanel" aria-labelledby="tab-builder" hidden>
       <form id="formBuilder" class="card" novalidate>
-        <h2>1) 入力</h2>
+        <h2 data-i18n="ui.input">1) 入力</h2>
         <div class="field">
-          <label for="lettersBuilder">文字列</label>
+          <label for="lettersBuilder" data-i18n="ui.letters">文字列</label>
           <input type="text" id="lettersBuilder" autocomplete="off" spellcheck="false" maxlength="400"
-                 placeholder="例: ANAGRAM HUNTER" aria-describedby="lettersBuilderHint">
-          <p class="hint" id="lettersBuilderHint">候補から1語ずつ選ぶと、その語の文字を除いた残りと、残りで作れる語に切り替わります。残りがなくなれば完成です。</p>
+                 placeholder="例: ANAGRAM HUNTER" aria-describedby="lettersBuilderHint" data-i18n-attr="placeholder:ph.anagramHunter">
+          <p class="hint" id="lettersBuilderHint" data-i18n="ui.builderHint">候補から1語ずつ選ぶと、その語の文字を除いた残りと、残りで作れる語に切り替わります。残りがなくなれば完成です。</p>
         </div>
         <div class="field-grid">
           <div class="field">
-            <label for="minLenBuilder">候補の最小の長さ</label>
+            <label for="minLenBuilder" data-i18n="ui.minLenCandidates">候補の最小の長さ</label>
             <input type="number" id="minLenBuilder" min="1" max="100" value="3" inputmode="numeric">
           </div>
           <div class="field">
-            <label for="limitBuilder">表示の上限（語）</label>
+            <label for="limitBuilder" data-i18n="ui.limitWords">表示の上限（語）</label>
             <input type="number" id="limitBuilder" min="1" max="10000" value="200" inputmode="numeric">
           </div>
         </div>
         <div class="run-actions">
-          <div class="dict-indicator">辞書: <span id="dictNameBuilder" class="dict-name"></span></div>
+          <div class="dict-indicator"><span data-i18n="ui.dictLabel">辞書:</span> <span id="dictNameBuilder" class="dict-name"></span></div>
           <div class="search-row">
-            <button type="submit" id="runBuilderBtn" class="btn btn-primary">組み立てを始める</button>
-            <button type="button" id="clearBuilderBtn" class="btn btn-ghost">クリア</button>
+            <button type="submit" id="runBuilderBtn" class="btn btn-primary" data-i18n="ui.startBuilder">組み立てを始める</button>
+            <button type="button" id="clearBuilderBtn" class="btn btn-ghost" data-i18n="ui.clear">クリア</button>
           </div>
           <p id="statusBuilder" class="status" role="status" aria-live="polite"></p>
         </div>
       </form>
 
       <section class="card" aria-labelledby="resultHeadingBuilder">
-        <h2 id="resultHeadingBuilder">2) 組み立て</h2>
+        <h2 id="resultHeadingBuilder" data-i18n="ui.building">2) 組み立て</h2>
         <div class="builder-state">
-          <p><span class="label">選んだ語:</span> <span id="builderChosen" class="builder-chosen"></span></p>
-          <p><span class="label">残りの文字:</span> <span id="builderRest" class="builder-rest"></span></p>
-          <ul id="builderTiles" class="letter-tiles" aria-label="残りの文字の個数"></ul>
+          <p><span class="label" data-i18n="ui.chosen">選んだ語:</span> <span id="builderChosen" class="builder-chosen"></span></p>
+          <p><span class="label" data-i18n="ui.rest">残りの文字:</span> <span id="builderRest" class="builder-rest"></span></p>
+          <ul id="builderTiles" class="letter-tiles" aria-label="残りの文字の個数" data-i18n-attr="aria-label:ui.tilesLabel"></ul>
           <p id="builderDone" class="done-note" hidden></p>
         </div>
         <div class="result-actions">
-          <button type="button" id="builderUndoBtn" class="btn">1語戻す</button>
-          <button type="button" id="builderResetBtn" class="btn btn-ghost">最初から</button>
+          <button type="button" id="builderUndoBtn" class="btn" data-i18n="ui.undo">1語戻す</button>
+          <button type="button" id="builderResetBtn" class="btn btn-ghost" data-i18n="ui.reset">最初から</button>
           <span id="resultInfoBuilder" class="muted"></span>
         </div>
         <div class="table-wrap">
           <table id="resultTableBuilder">
             <thead>
               <tr>
-                <th scope="col">候補（押すと選ぶ）</th>
-                <th scope="col">長さ</th>
-                <th scope="col">選んだあとの残り</th>
-                <th scope="col">あと1語で完成する語</th>
+                <th scope="col" data-i18n="ui.colPick">候補（押すと選ぶ）</th>
+                <th scope="col" data-i18n="ui.colLength">長さ</th>
+                <th scope="col" data-i18n="ui.colAfter">選んだあとの残り</th>
+                <th scope="col" data-i18n="ui.colFinish">あと1語で完成する語</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -360,37 +362,37 @@
     <!-- 比較（2つの文字列） -->
     <section id="panel-compare" class="tab-content" role="tabpanel" aria-labelledby="tab-compare" hidden>
       <form id="formCompare" class="card" novalidate>
-        <h2>1) 入力</h2>
-        <p>2つの文字列が互いのアナグラム（同じ文字を同じ数ずつ使う）かを比べます。辞書は使いません。</p>
+        <h2 data-i18n="ui.input">1) 入力</h2>
+        <p data-i18n="ui.compareIntro">2つの文字列が互いのアナグラム（同じ文字を同じ数ずつ使う）かを比べます。辞書は使いません。</p>
         <div class="field">
-          <label for="compareA">文字列A</label>
-          <input type="text" id="compareA" autocomplete="off" spellcheck="false" maxlength="400" placeholder="例: THE MORSE CODE">
+          <label for="compareA" data-i18n="ui.compareA">文字列A</label>
+          <input type="text" id="compareA" autocomplete="off" spellcheck="false" maxlength="400" placeholder="例: THE MORSE CODE" data-i18n-attr="placeholder:ph.morse">
         </div>
         <div class="field">
-          <label for="compareB">文字列B</label>
-          <input type="text" id="compareB" autocomplete="off" spellcheck="false" maxlength="400" placeholder="例: HERE COME DOTS">
+          <label for="compareB" data-i18n="ui.compareB">文字列B</label>
+          <input type="text" id="compareB" autocomplete="off" spellcheck="false" maxlength="400" placeholder="例: HERE COME DOTS" data-i18n-attr="placeholder:ph.dots">
         </div>
         <div class="run-actions">
           <div class="search-row">
-            <button type="submit" id="runCompareBtn" class="btn btn-primary">比べる</button>
-            <button type="button" id="clearCompareBtn" class="btn btn-ghost">クリア</button>
+            <button type="submit" id="runCompareBtn" class="btn btn-primary" data-i18n="ui.compareRun">比べる</button>
+            <button type="button" id="clearCompareBtn" class="btn btn-ghost" data-i18n="ui.clear">クリア</button>
           </div>
           <p id="statusCompare" class="status" role="status" aria-live="polite"></p>
         </div>
       </form>
 
       <section class="card" aria-labelledby="resultHeadingCompare">
-        <h2 id="resultHeadingCompare">2) 結果</h2>
+        <h2 id="resultHeadingCompare" data-i18n="ui.results">2) 結果</h2>
         <p id="compareVerdict" class="verdict"></p>
         <p id="compareDetail" class="summary"></p>
         <div class="table-wrap">
           <table id="resultTableCompare">
             <thead>
               <tr>
-                <th scope="col">文字</th>
-                <th scope="col">Aの数</th>
-                <th scope="col">Bの数</th>
-                <th scope="col">差</th>
+                <th scope="col" data-i18n="ui.colLetter">文字</th>
+                <th scope="col" data-i18n="ui.colCountA">Aの数</th>
+                <th scope="col" data-i18n="ui.colCountB">Bの数</th>
+                <th scope="col" data-i18n="ui.colDiff">差</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -402,43 +404,43 @@
     <!-- 辞書設定 -->
     <section id="panel-dictionary" class="tab-content" role="tabpanel" aria-labelledby="tab-dictionary" hidden>
       <section class="card">
-        <h2>辞書設定</h2>
-        <p>探索に使う辞書を選びます。複数を同時に使え、同じ語は1つにまとめます。辞書の語は英字だけに直して使います（a-dream → ADREAM）。</p>
+        <h2 data-i18n="ui.tabDictionary">辞書設定</h2>
+        <p data-i18n="ui.dictIntro">探索に使う辞書を選びます。複数を同時に使え、同じ語は1つにまとめます。辞書の語は英字だけに直して使います（a-dream → ADREAM）。</p>
         <p id="dictProtocolNote" class="stale-note" hidden></p>
-        <h3 id="dictListHeading">辞書の一覧</h3>
+        <h3 id="dictListHeading" data-i18n="ui.dictList">辞書の一覧</h3>
         <ul id="dictListContainer" class="dict-list" aria-labelledby="dictListHeading"></ul>
         <p id="dictStatus" class="status" role="status" aria-live="polite"></p>
 
         <div class="dictionary-info">
-          <h3>いま使っている辞書</h3>
-          <p>合計の語数: <strong id="wordCount">0</strong> 語</p>
-          <p>署名の数: <strong id="signatureCount">0</strong> 個</p>
-          <p class="hint">署名は、語の文字をABC順に並べ替えた文字列です（LISTEN → EILNST）。署名が同じ語どうしは、互いのアナグラムです。</p>
+          <h3 data-i18n="ui.dictCurrent">いま使っている辞書</h3>
+          <p><span data-i18n="ui.totalWords">合計の語数:</span> <strong id="wordCount">0</strong></p>
+          <p><span data-i18n="ui.signatureCount">署名の数:</span> <strong id="signatureCount">0</strong></p>
+          <p class="hint" data-i18n="ui.signatureHint">署名は、語の文字をABC順に並べ替えた文字列です（LISTEN → EILNST）。署名が同じ語どうしは、互いのアナグラムです。</p>
         </div>
 
-        <h3>自分の辞書を追加</h3>
+        <h3 data-i18n="ui.addDict">自分の辞書を追加</h3>
         <div class="add-dict">
           <div class="field">
-            <label for="wordlistFile">テキストファイル（1行に1語、UTF-8、10MBまで）</label>
+            <label for="wordlistFile" data-i18n="ui.fileLabel">テキストファイル（1行に1語、UTF-8、10MBまで）</label>
             <input type="file" id="wordlistFile" accept=".txt,text/plain">
           </div>
-          <button type="button" id="loadWordlistBtn" class="btn">ファイルを読み込む</button>
+          <button type="button" id="loadWordlistBtn" class="btn" data-i18n="ui.loadFile">ファイルを読み込む</button>
         </div>
         <div class="add-dict">
           <div class="field field-wide">
-            <label for="pasteWords">貼り付け（1行に1語）</label>
+            <label for="pasteWords" data-i18n="ui.pasteLabel">貼り付け（1行に1語）</label>
             <textarea id="pasteWords" rows="4" spellcheck="false" placeholder="ALICE&#10;BOB&#10;CAROL"></textarea>
           </div>
-          <button type="button" id="addPastedBtn" class="btn">貼り付けた語を追加</button>
+          <button type="button" id="addPastedBtn" class="btn" data-i18n="ui.addPasted">貼り付けた語を追加</button>
         </div>
-        <p class="hint">読み込んだ辞書はこのページの中だけで使い、どこにも送りません。ページを閉じると消えます。</p>
+        <p class="hint" data-i18n="ui.privacy">読み込んだ辞書はこのページの中だけで使い、どこにも送りません。ページを閉じると消えます。</p>
       </section>
     </section>
   </main>
 
   <footer class="footer">
-    <p>Day045 - 生成AIで作るセキュリティツール100</p>
-    <p>🔗 GitHubリポジトリはこちら（ <a href="https://github.com/ipusiron/anagram-hunter" target="_blank" rel="noopener noreferrer">ipusiron/anagram-hunter</a> ）</p>
+    <p data-i18n="ui.footerDay">Day045 - 生成AIで作るセキュリティツール100</p>
+    <p><span data-i18n="ui.footerRepo">🔗 GitHubリポジトリ:</span> <a href="https://github.com/ipusiron/anagram-hunter" target="_blank" rel="noopener noreferrer">ipusiron/anagram-hunter</a></p>
   </footer>
 
   <script type="module" src="./script.js"></script>

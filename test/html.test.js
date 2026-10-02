@@ -60,7 +60,7 @@ test('画面の要素の id がそろっている（それぞれ1つだけ）', 
 });
 
 test('タブは role=tablist／tab／tabpanel の組で、aria-controls と aria-labelledby が対応する', () => {
-  assert.match(html, /<div class="tab-nav" role="tablist" aria-label="[^"]+">/);
+  assert.match(html, /<div class="tab-nav" role="tablist" aria-label="[^"]+"[^>]*>/);
   const tabs = [...html.matchAll(/<button type="button" role="tab" id="(tab-[\w-]+)"[^>]*\s+aria-controls="(panel-[\w-]+)" aria-selected="(true|false)"/g)];
   assert.equal(tabs.length, 6);
   assert.equal(tabs.filter((m) => m[3] === 'true').length, 1);
@@ -73,7 +73,7 @@ test('ボタンには type、入力欄にはラベル、外部リンクには no
   for (const m of html.matchAll(/<button\b[^>]*>/g)) assert.match(m[0], /type="(button|submit)"/, m[0]);
   for (const m of html.matchAll(/<(input|textarea|select)\b[^>]*id="([^"]+)"/g)) {
     if (m[0].includes('type="checkbox"')) continue;
-    assert.match(html, new RegExp(`<label for="${m[2]}">`), m[2]);
+    assert.match(html, new RegExp(`<label for="${m[2]}"[ >]`), m[2]);
   }
   for (const m of html.matchAll(/<a\b[^>]*href="https?:[^"]*"[^>]*>/g)) assert.match(m[0], /rel="noopener noreferrer"/, m[0]);
   assert.match(read('script.js'), /rel: 'noopener noreferrer'/);
