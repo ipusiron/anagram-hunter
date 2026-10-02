@@ -9,6 +9,7 @@ const JA = {
   'dict.bundled.security': 'セキュリティ・暗号用語（security）',
   'dict.bundled.animals': '動物名（animals）',
   'dict.bundled.poe': 'エドガー・アラン・ポーの作品名と語彙（EdgarAllanPoe）',
+  'dict.bundled.twelvedicts': '大きい英単語辞書（12dicts 3of6game、活用形を含む）',
   'dict.pasted': '貼り付けた辞書 {n}',
   'dict.none': '辞書未選択',
   'dict.loading': '読み込み中…',

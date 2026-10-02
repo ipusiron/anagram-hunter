@@ -15,7 +15,9 @@ export const BUNDLED_WORDLISTS = [
   { id: 'english_1842', file: 'wordlists/english_1842.txt', lines: 1842, words: 1472 },
   { id: 'security', file: 'wordlists/security.txt', lines: 1189, words: 1189 },
   { id: 'animals', file: 'wordlists/animals.txt', lines: 695, words: 546 },
-  { id: 'poe', file: 'wordlists/EdgarAllanPoe.txt', lines: 1197, words: 1008 }
+  { id: 'poe', file: 'wordlists/EdgarAllanPoe.txt', lines: 1197, words: 1008 },
+  // 12dicts 6.0.2 の 3of6game（Alan Beale、公有）。出典と SHA-256 は wordlists/12dicts-NOTICE.md
+  { id: 'twelvedicts', file: 'wordlists/12dicts-3of6game.txt', lines: 64662, words: 64662 }
 ];
 
 // HTTP(S) で開いたときに最初から読み込む付属辞書（一般的な英単語）

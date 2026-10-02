@@ -10,7 +10,7 @@ const F = readFilters({ minLen: '2' }).filters;
 const pairs = (idx, s) => findPairs(idx, s, F).pairs.map((p) => p.words.join(' '));
 
 test('付属辞書の行数と語数（正規化して重複を除いたあと）が一覧の値と一致する', () => {
-  assert.equal(BUNDLED_WORDLISTS.length, 5);
+  assert.equal(BUNDLED_WORDLISTS.length, 6);
   for (const w of BUNDLED_WORDLISTS) {
     assert.equal(lists[w.id].lines, w.lines, `${w.id} lines`);
     assert.equal(lists[w.id].words.length, w.words, `${w.id} words`);
@@ -53,4 +53,16 @@ test('辞書名: 制御文字を空白に、長すぎる名前は切る', () => 
   assert.equal(long.length, MAX_NAME_LENGTH);
   assert.ok(long.endsWith('…'));
   assert.equal(displayName(undefined), '');
+});
+
+test('12dicts 3of6game: 改行を LF にそろえた内容の SHA-256 が出典の記載と一致し、出典の文書がある', async () => {
+  const { createHash } = await import('node:crypto');
+  const text = read('wordlists/12dicts-3of6game.txt').replace(/\r\n/g, '\n');
+  const hash = createHash('sha256').update(text, 'utf8').digest('hex');
+  const notice = read('wordlists/12dicts-NOTICE.md');
+  assert.equal(hash, 'aecd303c276568591a7cb788c2c27fd412151430541b82237bd0cd3693a7d9c6');
+  assert.ok(notice.includes(hash));
+  assert.ok(notice.includes('public domain'));
+  assert.ok(notice.includes('Alan Beale'));
+  assert.ok(!DEFAULT_WORDLISTS.includes('twelvedicts'), '大きい辞書は最初から読み込まない');
 });

@@ -97,8 +97,22 @@ export function buildIndex(wordLists) {
   return { words, bySignature, freq };
 }
 
+// 位置の指定（クロスワード式）。英字はその位置の文字、? . _ はどの文字でもよい1字（S?L??? → 6文字で、1文字目がS・3文字目がL）。
+// 空白は無視。それ以外の文字があれば null（誤り）を返す
+export function normalizePattern(text) {
+  const decomposed = String(text ?? '').normalize('NFKC').normalize('NFD');
+  let out = '';
+  for (const ch of decomposed) {
+    if (/\p{M}/u.test(ch) || /\s/u.test(ch)) continue;
+    if (ch === '?' || ch === '.' || ch === '_') out += '?';
+    else if (/^[A-Z]$/.test(ch.toUpperCase())) out += ch.toUpperCase();
+    else return null;
+  }
+  return out;
+}
+
 // 画面の入力（文字列）から絞り込みの条件を作る。誤りは { ok: false, error: キー, ... } で返す（文言は messages.js）
-export function readFilters({ minLen = '', maxLen = '', startsWith = '', endsWith = '', contains = '' } = {}) {
+export function readFilters({ minLen = '', maxLen = '', startsWith = '', endsWith = '', contains = '', pattern = '' } = {}) {
   const num = (s) => {
     const t = String(s ?? '').trim();
     if (t === '') return null;
@@ -111,6 +125,8 @@ export function readFilters({ minLen = '', maxLen = '', startsWith = '', endsWit
   const lo = min ?? 1;
   const hi = max ?? MAX_WORD_LENGTH;
   if (lo > hi) return { ok: false, error: 'range', min: lo, max: hi };
+  const pat = normalizePattern(pattern);
+  if (pat === null) return { ok: false, error: 'pattern' };
   return {
     ok: true,
     filters: {
@@ -118,7 +134,8 @@ export function readFilters({ minLen = '', maxLen = '', startsWith = '', endsWit
       maxLen: hi,
       startsWith: normalizeLetters(startsWith).letters,
       endsWith: normalizeLetters(endsWith).letters,
-      contains: normalizeLetters(contains).letters
+      contains: normalizeLetters(contains).letters,
+      pattern: pat
     }
   };
 }
@@ -128,6 +145,10 @@ export function passFilters(word, f) {
   if (f.startsWith && !word.startsWith(f.startsWith)) return false;
   if (f.endsWith && !word.endsWith(f.endsWith)) return false;
   if (f.contains && !word.includes(f.contains)) return false;
+  if (f.pattern) {
+    if (word.length !== f.pattern.length) return false;
+    for (let i = 0; i < word.length; i++) if (f.pattern[i] !== '?' && f.pattern[i] !== word[i]) return false;
+  }
   return true;
 }
 
@@ -176,6 +197,128 @@ export function findPairs(index, letters, filters) {
   const shorter = (p) => Math.min(p.words[0].length, p.words[1].length);
   pairs.sort((a, b) => shorter(b) - shorter(a) || byWord(a.words.join(' '), b.words.join(' ')));
   return { pairs, firstCandidates };
+}
+
+// 入力の文字から語の文字を取り除いた残り（署名の形）。作れないときは null
+export function removeWord(letters, word) {
+  const have = freqVector(letters);
+  const need = freqVector(word);
+  return canCover(need, have) ? vectorToSignature(subtract(have, need)) : null;
+}
+
+export const PHRASE_LIMITS = { maxWords: 5, results: 5000, steps: 2000000 };
+
+// 複数語（フレーズ）のアナグラム。入力の文字をちょうど使い切る、maxWords 語以下の組をすべて探す。
+// opts: maxWords（必ず含める語を含めた語数の上限）、include（必ず含める語の配列）、exclude（使わない語の配列）、
+//       allowRepeat（同じ語を2回以上使ってよいか）、limit（結果の上限）、steps（探索の手数の上限）
+// 語は長い順に並べた候補から、前に選んだ語より後ろ（同じ語の繰り返しを許すなら同じ位置から）だけを選ぶので、
+// 語の順だけが違う組は1回しか出ない。最後の1語は、残りの文字の署名で索引を引いて決める（2語の探索と同じ）
+export function findPhrases(index, letters, filters, opts = {}) {
+  const maxWords = Math.min(opts.maxWords ?? 3, PHRASE_LIMITS.maxWords);
+  const limit = opts.limit ?? 1000;
+  const stepLimit = opts.steps ?? PHRASE_LIMITS.steps;
+  const include = opts.include ?? [];
+  const exclude = new Set(opts.exclude ?? []);
+  let have = freqVector(letters);
+  for (const w of include) {
+    const fv = freqVector(w);
+    if (!canCover(fv, have)) return { ok: false, error: 'includeNotInInput', word: w };
+    have = subtract(have, fv);
+  }
+  const left0 = letters.length - include.reduce((n, w) => n + w.length, 0);
+  const slots = maxWords - include.length;
+  const result = { ok: true, phrases: [], truncated: null, steps: 0, candidates: 0 };
+  if (left0 === 0) {
+    if (include.length) result.phrases.push({ words: [...include], found: [] });
+    return result;
+  }
+  if (slots <= 0) return result;
+
+  const pool = index.words.filter((w) => !exclude.has(w) && passFilters(w, filters) && w.length <= left0 && canCover(index.freq.get(w), have));
+  pool.sort((a, b) => b.length - a.length || byWord(a, b));
+  const position = new Map(pool.map((w, i) => [w, i]));
+  const vec = pool.map((w) => index.freq.get(w));
+  result.candidates = pool.length;
+  const minLen = filters.minLen;
+  const acc = [];
+  const timeLimit = opts.timeMs ?? Infinity;
+  const started = Date.now();
+
+  const record = (words) => {
+    result.phrases.push({ words: [...include, ...words], found: words });
+    if (result.phrases.length >= limit) result.truncated = 'results';
+  };
+
+  // cands＝いまの残りの文字で作れる候補（pool の位置、昇順）。子へは、その語を除いた残りでも作れる候補だけを渡す
+  const rec = (cur, cands, start, left, slotsLeft) => {
+    if (result.truncated) return;
+    result.steps += 1;
+    if (result.steps > stepLimit) {
+      result.truncated = 'steps';
+      return;
+    }
+    if (result.steps % 1024 === 0 && Date.now() - started > timeLimit) {
+      result.truncated = 'time';
+      return;
+    }
+    // 最後の1語: 署名で引く（候補の並びで start 以降のものだけ）
+    for (const w of index.bySignature.get(vectorToSignature(cur)) || []) {
+      const p = position.get(w);
+      if (p === undefined || p < start) continue;
+      record([...acc, w]);
+      if (result.truncated) return;
+    }
+    if (slotsLeft === 1 || left < 2 * minLen) return;
+    for (let k = 0; k < cands.length; k++) {
+      const i = cands[k];
+      const w = pool[i];
+      // 残りを2語以上に分けるので、この語は残りの文字数から最小の長さを引いた長さまで
+      if (w.length > left - minLen) continue;
+      const next = subtract(cur, vec[i]);
+      const rest = left - w.length;
+      // 子があと1語しか選べないなら、子は署名を引くだけなので候補の絞り込みは要らない
+      const from = opts.allowRepeat === false ? k + 1 : k;
+      const sub = [];
+      if (slotsLeft - 1 > 1) {
+        for (let m = from; m < cands.length; m++) {
+          const j = cands[m];
+          if (pool[j].length <= rest && canCover(vec[j], next)) sub.push(j);
+        }
+      }
+      acc.push(w);
+      rec(next, sub, opts.allowRepeat === false ? i + 1 : i, rest, slotsLeft - 1);
+      acc.pop();
+      if (result.truncated) return;
+    }
+  };
+  rec(have, pool.map((_, i) => i), 0, left0, slots);
+
+  const shortest = (p) => Math.min(...p.words.map((w) => w.length));
+  result.phrases.sort((a, b) => a.words.length - b.words.length || shortest(b) - shortest(a) || byWord(a.words.join(' '), b.words.join(' ')));
+  return result;
+}
+
+// 2つの文字列の文字を比べる。アナグラムどうしか、どちらにだけある文字（とその数）、片方がもう片方の文字で作れるか
+export function compareLetters(textA, textB) {
+  const a = normalizeLetters(textA);
+  const b = normalizeLetters(textB);
+  const va = freqVector(a.letters);
+  const vb = freqVector(b.letters);
+  const onlyA = [];
+  const onlyB = [];
+  for (let i = 0; i < 26; i++) {
+    if (va[i] > vb[i]) onlyA.push({ letter: ALPHABET[i], count: va[i] - vb[i] });
+    if (vb[i] > va[i]) onlyB.push({ letter: ALPHABET[i], count: vb[i] - va[i] });
+  }
+  return {
+    a, b,
+    signatureA: vectorToSignature(va),
+    signatureB: vectorToSignature(vb),
+    isAnagram: a.letters.length > 0 && onlyA.length === 0 && onlyB.length === 0,
+    onlyA, onlyB,
+    aContainsB: canCover(vb, va),
+    bContainsA: canCover(va, vb)
+  };
 }
 
 // 書き出し用。CSV は Excel で文字化けしないよう BOM つき・CRLF、すべての欄を引用符で囲む

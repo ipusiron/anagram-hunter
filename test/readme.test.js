@@ -77,8 +77,9 @@ test('付属辞書の表は、wordlists/ の実ファイルと一致する', () 
     assert.equal(row[4].trim(), DEFAULT_WORDLISTS.includes(w.id) ? '○' : '', w.id);
   }
   assert.ok(md.includes(`内蔵ミニ辞書（${BUILTIN_WORDS.length}語`));
-  const all = buildIndex([BUILTIN_WORDS, ...BUNDLED_WORDLISTS.map((w) => lists[w.id].words)]);
-  assert.ok(md.includes(`${fmt(all.words.length)}語（内蔵ミニ辞書を含む）`));
+  const small = buildIndex([BUILTIN_WORDS, ...BUNDLED_WORDLISTS.filter((w) => w.id !== 'twelvedicts').map((w) => lists[w.id].words)]);
+  assert.ok(md.includes(`小さい付属辞書5本は合わせても${fmt(small.words.length)}語（内蔵ミニ辞書を含む）`));
+  assert.ok(md.includes(`大きい英単語辞書（${fmt(lists.twelvedicts.words.length)}語）`));
 });
 
 test('探索の仕組みの表（2語の組）と、本文の数値は実装と一致する', () => {
