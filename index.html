@@ -3,241 +3,247 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
   <title>Anagram Hunter</title>
+  <meta name="description" content="Anagram Hunter: 辞書の署名で1語・2語のアナグラムを探す、ブラウザーの中だけで動くツール">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <script src="js/theme-init.js"></script>
+  <script src="js/file-check.js" defer></script>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
+  <noscript>
+    <p class="boot-notice">このツールはJavaScriptを使います。ブラウザーの設定でJavaScriptを有効にしてください。<br>
+    This tool needs JavaScript. Please enable JavaScript in your browser settings.</p>
+  </noscript>
+  <div id="fileNotice" class="boot-notice hidden" role="alert">
+    <div data-lang="ja">
+      <p>このページをファイルとして直接開いたため、ブラウザーがプログラム（ES modules）を読み込めず、ツールが動いていません。</p>
+      <p>フォルダーで<code>python -m http.server 8000</code>などを実行し、<code>http://localhost:8000/</code>で開いてください。</p>
+      <p>公開版は<a href="https://ipusiron.github.io/anagram-hunter/" rel="noopener noreferrer">https://ipusiron.github.io/anagram-hunter/</a>です。</p>
+    </div>
+    <div data-lang="en" hidden>
+      <p>This page was opened directly as a file, so the browser could not load its program (ES modules) and the tool is not running.</p>
+      <p>Run <code>python -m http.server 8000</code> or similar in the folder and open <code>http://localhost:8000/</code>.</p>
+      <p>The public version is at <a href="https://ipusiron.github.io/anagram-hunter/" rel="noopener noreferrer">https://ipusiron.github.io/anagram-hunter/</a>.</p>
+    </div>
+  </div>
+
   <header class="site-header">
-    <h1>Anagram Hunter</h1>
-    <p class="subtitle">辞書署名インデックスで高速アナグラム探索</p>
+    <div class="header-inner">
+      <div class="header-side" aria-hidden="true"></div>
+      <div class="hero">
+        <h1>Anagram Hunter</h1>
+        <p class="subtitle">辞書の署名で1語・2語のアナグラムを探す（入力も辞書もブラウザーの外へ送りません）</p>
+      </div>
+      <div class="header-side header-actions">
+        <button type="button" id="btnTheme" class="icon-btn" aria-label="ダークモードに切り替える">🌙</button>
+      </div>
+    </div>
   </header>
 
   <main class="container">
-    <!-- Tab Navigation -->
-    <div class="tab-nav">
-      <button class="tab-btn active" data-tab="single">単語アナグラム</button>
-      <button class="tab-btn" data-tab="two-word">2語アナグラム</button>
-      <button class="tab-btn" data-tab="passphrase">パスフレーズ</button>
-      <button class="tab-btn" data-tab="dictionary">辞書設定</button>
+    <div class="tab-nav" role="tablist" aria-label="機能の切り替え">
+      <button type="button" role="tab" id="tab-single" class="tab-btn active" data-tab="single"
+              aria-controls="panel-single" aria-selected="true">単語アナグラム</button>
+      <button type="button" role="tab" id="tab-two-word" class="tab-btn" data-tab="two-word"
+              aria-controls="panel-two-word" aria-selected="false" tabindex="-1">2語アナグラム</button>
+      <button type="button" role="tab" id="tab-dictionary" class="tab-btn" data-tab="dictionary"
+              aria-controls="panel-dictionary" aria-selected="false" tabindex="-1">辞書設定</button>
     </div>
 
-    <!-- Tab Content: Single Word Anagram -->
-    <div class="tab-content active" data-tab="single">
-      <section class="card">
+    <!-- 単語アナグラム -->
+    <section id="panel-single" class="tab-content" role="tabpanel" aria-labelledby="tab-single">
+      <form id="formSingle" class="card" novalidate>
         <h2>1) 入力</h2>
-        <div class="row">
-          <div class="col">
-            <label>文字列:
-              <input type="text" id="letters" placeholder="LISTEN / SILENT など" />
-            </label>
-            <button id="normalizeBtn" class="btn">正規化（A–Z）</button>
-            <button id="clearBtn" class="btn btn-ghost">クリア</button>
+        <div class="field">
+          <label for="letters">文字列</label>
+          <input type="text" id="letters" autocomplete="off" spellcheck="false" maxlength="400"
+                 placeholder="例: LISTEN" aria-describedby="lettersHint">
+          <p class="hint" id="lettersHint">英字だけを使います。全角英字やアクセント記号つきの字も使え、空白・数字・記号は無視します。</p>
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label for="minLen">最小の長さ</label>
+            <input type="number" id="minLen" min="1" max="100" value="2" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="maxLen">最大の長さ</label>
+            <input type="number" id="maxLen" min="1" max="100" inputmode="numeric" placeholder="制限なし">
+          </div>
+          <div class="field">
+            <label for="startsWith">先頭の文字列</label>
+            <input type="text" id="startsWith" autocomplete="off" spellcheck="false" placeholder="例: S">
+          </div>
+          <div class="field">
+            <label for="endsWith">末尾の文字列</label>
+            <input type="text" id="endsWith" autocomplete="off" spellcheck="false" placeholder="例: ING">
+          </div>
+          <div class="field">
+            <label for="contains">含む文字列</label>
+            <input type="text" id="contains" autocomplete="off" spellcheck="false" placeholder="例: ST">
+          </div>
+          <div class="field">
+            <label for="limitSingle">表示の上限（件）</label>
+            <input type="number" id="limitSingle" min="1" max="10000" value="200" inputmode="numeric">
           </div>
         </div>
-
-        <div class="row">
-          <div class="col">
-            <label>最小長: <input type="number" id="minLen" min="1" value="2" />
-              <span class="help-icon" data-tooltip="見つかる単語の最小文字数">?</span>
-            </label>
-            <label>最大長: <input type="number" id="maxLen" min="1" value="20" />
-              <span class="help-icon" data-tooltip="見つかる単語の最大文字数">?</span>
-            </label>
+        <div class="run-actions">
+          <div class="dict-indicator">辞書: <span id="dictNameSingle" class="dict-name"></span></div>
+          <div class="search-row">
+            <button type="submit" id="runSingleBtn" class="btn btn-primary">探索</button>
+            <button type="button" id="clearBtn" class="btn btn-ghost">クリア</button>
           </div>
-          <div class="col">
-            <label>先頭: <input type="text" id="startsWith" placeholder="^PAT" />
-              <span class="help-icon" data-tooltip="単語の先頭文字列を指定">?</span>
-            </label>
-            <label>末尾: <input type="text" id="endsWith" placeholder="ING$" />
-              <span class="help-icon" data-tooltip="単語の末尾文字列を指定">?</span>
-            </label>
-            <label>部分一致: <input type="text" id="contains" placeholder="ANY" />
-              <span class="help-icon" data-tooltip="単語内のどこかに含まれる文字列">?</span>
-            </label>
-          </div>
+          <p id="statusSingle" class="status" role="status" aria-live="polite"></p>
         </div>
-      </section>
+      </form>
 
-      <div class="run-actions">
-        <div class="dict-indicator">辞書: <span id="dictNameSingle" class="dict-name">内蔵ミニ辞書</span></div>
-        <div class="search-row">
-          <button id="runSingleBtn" class="btn btn-primary">探索</button>
-          <span id="statusSingle" class="status"></span>
-        </div>
-      </div>
-
-      <section class="card">
-        <h2>2) 結果</h2>
+      <section class="card" aria-labelledby="resultHeadingSingle">
+        <h2 id="resultHeadingSingle">2) 結果</h2>
+        <p id="summarySingle" class="summary"></p>
+        <p id="staleSingle" class="stale-note" hidden></p>
         <div class="result-actions">
-          <label class="result-filter">
+          <label class="check">
             <input type="checkbox" id="showPartialSingle">
-            部分一致も表示
-            <span class="help-icon" data-tooltip="入力文字の一部のみを使った単語も表示">?</span>
+            一部の文字だけを使う語も表示
           </label>
-          <button id="exportCsvSingleBtn" class="btn btn-ghost">CSVエクスポート</button>
-          <button id="exportJsonSingleBtn" class="btn btn-ghost">JSONエクスポート</button>
+          <button type="button" id="exportCsvSingleBtn" class="btn btn-ghost">CSVで保存</button>
+          <button type="button" id="exportJsonSingleBtn" class="btn btn-ghost">JSONで保存</button>
           <span id="resultInfoSingle" class="muted"></span>
         </div>
         <div class="table-wrap">
           <table id="resultTableSingle">
             <thead>
               <tr>
-                <th>#</th>
-                <th>候補</th>
-                <th>タイプ</th>
-                <th>長さ</th>
-                <th>辞書</th>
+                <th scope="col">#</th>
+                <th scope="col">候補</th>
+                <th scope="col">種類</th>
+                <th scope="col">長さ</th>
+                <th scope="col">残りの文字</th>
+                <th scope="col">辞書</th>
               </tr>
             </thead>
             <tbody></tbody>
           </table>
         </div>
       </section>
-    </div>
+    </section>
 
-    <!-- Tab Content: Two Word Anagram -->
-    <div class="tab-content" data-tab="two-word">
-      <section class="card">
+    <!-- 2語アナグラム -->
+    <section id="panel-two-word" class="tab-content" role="tabpanel" aria-labelledby="tab-two-word" hidden>
+      <form id="formTwoWord" class="card" novalidate>
         <h2>1) 入力</h2>
-        <div class="row">
-          <div class="col">
-            <label>文字列:
-              <input type="text" id="lettersTwoWord" placeholder="LISTEN / SILENT など" />
-            </label>
-            <button id="normalizeTwoWordBtn" class="btn">正規化（A–Z）</button>
-            <button id="clearTwoWordBtn" class="btn btn-ghost">クリア</button>
+        <div class="field">
+          <label for="lettersTwoWord">文字列</label>
+          <input type="text" id="lettersTwoWord" autocomplete="off" spellcheck="false" maxlength="400"
+                 placeholder="例: DORMITORY" aria-describedby="lettersTwoWordHint">
+          <p class="hint" id="lettersTwoWordHint">入力の文字をちょうど使い切る2語の組を、すべて探します。</p>
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label for="minLenTwoWord">各語の最小の長さ</label>
+            <input type="number" id="minLenTwoWord" min="1" max="100" value="2" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="maxLenTwoWord">各語の最大の長さ</label>
+            <input type="number" id="maxLenTwoWord" min="1" max="100" inputmode="numeric" placeholder="制限なし">
+          </div>
+          <div class="field">
+            <label for="startsWithTwoWord">各語の先頭の文字列</label>
+            <input type="text" id="startsWithTwoWord" autocomplete="off" spellcheck="false" placeholder="例: S">
+          </div>
+          <div class="field">
+            <label for="endsWithTwoWord">各語の末尾の文字列</label>
+            <input type="text" id="endsWithTwoWord" autocomplete="off" spellcheck="false" placeholder="例: ING">
+          </div>
+          <div class="field">
+            <label for="containsTwoWord">各語が含む文字列</label>
+            <input type="text" id="containsTwoWord" autocomplete="off" spellcheck="false" placeholder="例: ST">
+          </div>
+          <div class="field">
+            <label for="topN">表示の上限（組）</label>
+            <input type="number" id="topN" min="1" max="10000" value="200" inputmode="numeric">
           </div>
         </div>
-
-        <div class="row">
-          <div class="col">
-            <label>最小長: <input type="number" id="minLenTwoWord" min="1" value="2" />
-              <span class="help-icon" data-tooltip="各単語の最小文字数">?</span>
-            </label>
-            <label>最大長: <input type="number" id="maxLenTwoWord" min="1" value="20" />
-              <span class="help-icon" data-tooltip="各単語の最大文字数">?</span>
-            </label>
+        <div class="run-actions">
+          <div class="dict-indicator">辞書: <span id="dictNameTwoWord" class="dict-name"></span></div>
+          <div class="search-row">
+            <button type="submit" id="runTwoWordBtn" class="btn btn-primary">2語を探索</button>
+            <button type="button" id="clearTwoWordBtn" class="btn btn-ghost">クリア</button>
           </div>
-          <div class="col">
-            <label>先頭: <input type="text" id="startsWithTwoWord" placeholder="^PAT" />
-              <span class="help-icon" data-tooltip="各単語の先頭文字列を指定">?</span>
-            </label>
-            <label>末尾: <input type="text" id="endsWithTwoWord" placeholder="ING$" />
-              <span class="help-icon" data-tooltip="各単語の末尾文字列を指定">?</span>
-            </label>
-            <label>部分一致: <input type="text" id="containsTwoWord" placeholder="ANY" />
-              <span class="help-icon" data-tooltip="各単語内に含まれる文字列">?</span>
-            </label>
-          </div>
+          <p id="statusTwoWord" class="status" role="status" aria-live="polite"></p>
         </div>
+      </form>
 
-        <div class="row">
-          <div class="col">
-            <label>ビーム幅: <input type="number" id="beamWidth" min="1" value="200" />
-              <span class="help-icon" data-tooltip="探索時の候補数制限（大きいほど網羅的だが遅い）">?</span>
-            </label>
-            <label>上位N件: <input type="number" id="topN" min="1" value="200" />
-              <span class="help-icon" data-tooltip="表示する結果の最大数">?</span>
-            </label>
-          </div>
-        </div>
-      </section>
-
-      <div class="run-actions">
-        <div class="dict-indicator">辞書: <span id="dictNameTwoWord" class="dict-name">内蔵ミニ辞書</span></div>
-        <div class="search-row">
-          <button id="runTwoWordBtn" class="btn btn-primary">2語探索</button>
-          <span id="statusTwoWord" class="status"></span>
-        </div>
-      </div>
-
-      <section class="card">
-        <h2>2) 結果</h2>
+      <section class="card" aria-labelledby="resultHeadingTwoWord">
+        <h2 id="resultHeadingTwoWord">2) 結果</h2>
+        <p id="summaryTwoWord" class="summary"></p>
+        <p id="staleTwoWord" class="stale-note" hidden></p>
         <div class="result-actions">
-          <label class="result-filter">
-            <input type="checkbox" id="showPartialTwoWord">
-            部分一致も表示
-            <span class="help-icon" data-tooltip="入力文字の一部のみを使った2語組み合わせも表示">?</span>
-          </label>
-          <button id="exportCsvTwoWordBtn" class="btn btn-ghost">CSVエクスポート</button>
-          <button id="exportJsonTwoWordBtn" class="btn btn-ghost">JSONエクスポート</button>
+          <button type="button" id="exportCsvTwoWordBtn" class="btn btn-ghost">CSVで保存</button>
+          <button type="button" id="exportJsonTwoWordBtn" class="btn btn-ghost">JSONで保存</button>
           <span id="resultInfoTwoWord" class="muted"></span>
         </div>
         <div class="table-wrap">
           <table id="resultTableTwoWord">
             <thead>
               <tr>
-                <th>#</th>
-                <th>候補</th>
-                <th>タイプ</th>
-                <th>長さ</th>
-                <th>辞書</th>
+                <th scope="col">#</th>
+                <th scope="col">候補（2語）</th>
+                <th scope="col">語の長さ</th>
+                <th scope="col">辞書</th>
               </tr>
             </thead>
             <tbody></tbody>
           </table>
         </div>
       </section>
-    </div>
+    </section>
 
-    <!-- Tab Content: Passphrase Anagram -->
-    <div class="tab-content" data-tab="passphrase">
-      <section class="card">
-        <h2>パスフレーズアナグラム（未実装）</h2>
-        <p class="muted">この機能は今後実装予定です。3語以上の組み合わせやフレーズ生成を想定しています。</p>
-      </section>
-    </div>
-
-    <!-- Tab Content: Dictionary Settings -->
-    <div class="tab-content" data-tab="dictionary">
+    <!-- 辞書設定 -->
+    <section id="panel-dictionary" class="tab-content" role="tabpanel" aria-labelledby="tab-dictionary" hidden>
       <section class="card">
         <h2>辞書設定</h2>
-        <div class="row">
-          <div class="col">
-            <input type="file" id="wordlistFile" accept=".txt" />
-            <button id="loadWordlistBtn" class="btn">辞書を読み込み</button>
-          </div>
-          <div class="col">
-            <label>相対パス（Pages）:
-              <input type="text" id="wordlistPath" placeholder="wordlists/english-words-5k.txt" />
-            </label>
-            <button id="fetchWordlistBtn" class="btn btn-secondary">fetchで取得</button>
-          </div>
-        </div>
-        <p class="muted" id="dictStatus">辞書：内蔵ミニ辞書（非常に小）</p>
-        
+        <p>探索に使う辞書を選びます。複数を同時に使え、同じ語は1つにまとめます。辞書の語は英字だけに直して使います（a-dream → ADREAM）。</p>
+        <p id="dictProtocolNote" class="stale-note" hidden></p>
+        <h3 id="dictListHeading">辞書の一覧</h3>
+        <ul id="dictListContainer" class="dict-list" aria-labelledby="dictListHeading"></ul>
+        <p id="dictStatus" class="status" role="status" aria-live="polite"></p>
+
         <div class="dictionary-info">
-          <h3>辞書情報</h3>
-          <p>合計単語数: <span id="wordCount">18</span> 語</p>
-          <p>署名数: <span id="signatureCount">15</span> 個
-            <span class="help-icon" data-tooltip="署名=文字をソートした文字列。例: LISTEN→EILNST">?</span>
-          </p>
-          
-          <h3>読み込み済み辞書</h3>
-          <div id="dictListContainer" class="dict-list-container">
-            <!-- Dictionary list will be populated here -->
-          </div>
+          <h3>いま使っている辞書</h3>
+          <p>合計の語数: <strong id="wordCount">0</strong> 語</p>
+          <p>署名の数: <strong id="signatureCount">0</strong> 個</p>
+          <p class="hint">署名は、語の文字をABC順に並べ替えた文字列です（LISTEN → EILNST）。署名が同じ語どうしは、互いのアナグラムです。</p>
         </div>
 
-        <div class="dictionary-help">
-          <h3>使い方</h3>
-          <ul>
-            <li>ローカルファイル: テキストファイル（.txt）を選択して「辞書を読み込み」をクリック</li>
-            <li>GitHub Pages: 相対パスを入力して「fetchで取得」をクリック</li>
-            <li>形式: 1行に1単語のテキストファイル</li>
-            <li>正規化: 自動的にA-Zのみに変換され、重複は除去されます</li>
-          </ul>
+        <h3>自分の辞書を追加</h3>
+        <div class="add-dict">
+          <div class="field">
+            <label for="wordlistFile">テキストファイル（1行に1語、UTF-8、10MBまで）</label>
+            <input type="file" id="wordlistFile" accept=".txt,text/plain">
+          </div>
+          <button type="button" id="loadWordlistBtn" class="btn">ファイルを読み込む</button>
         </div>
+        <div class="add-dict">
+          <div class="field field-wide">
+            <label for="pasteWords">貼り付け（1行に1語）</label>
+            <textarea id="pasteWords" rows="4" spellcheck="false" placeholder="ALICE&#10;BOB&#10;CAROL"></textarea>
+          </div>
+          <button type="button" id="addPastedBtn" class="btn">貼り付けた語を追加</button>
+        </div>
+        <p class="hint">読み込んだ辞書はこのページの中だけで使い、どこにも送りません。ページを閉じると消えます。</p>
       </section>
-    </div>
+    </section>
   </main>
 
-  <footer>
-    <div class="footer">
-      🔗 GitHubリポジトリはこちら（ <a href="https://github.com/ipusiron/anagram-hunter" target="_blank" rel="noopener noreferrer">ipusiron/anagram-hunter</a> ）
-    </div>
+  <footer class="footer">
+    <p>Day045 - 生成AIで作るセキュリティツール100</p>
+    <p>🔗 GitHubリポジトリはこちら（ <a href="https://github.com/ipusiron/anagram-hunter" target="_blank" rel="noopener noreferrer">ipusiron/anagram-hunter</a> ）</p>
   </footer>
 
-  <script src="./script.js"></script>
+  <script type="module" src="./script.js"></script>
 </body>
 </html>

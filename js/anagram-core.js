@@ -1,0 +1,185 @@
+// Anagram Hunter の探索ロジック（DOM 非依存。画面と node:test の両方から読む）
+// 語は A〜Z の大文字だけで扱う。署名＝文字を並べ替えた文字列（LISTEN → EILNST）、
+// 頻度ベクトル＝A〜Z の26文字それぞれの個数。どちらも「並べ替えると同じ語か」を判定する道具になる
+
+export const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+// 入力の上限（文字数）。1語・2語の探索は辞書を1回なめるだけなので、入力の長さで遅くはならない。画面の扱いやすさの上限
+export const MAX_INPUT_LETTERS = 100;
+// 結果の語の長さの上限として受け付ける最大値
+export const MAX_WORD_LENGTH = 100;
+
+// 入力を A〜Z の大文字にそろえる。全角英字（ＬＩＳＴＥＮ）は NFKC で半角に、アクセント記号（é）は NFD で分けて外す。
+// 空白は区切りとして数えず、それ以外の英字でない文字（数字・記号・かななど）は ignored に数える
+export function normalizeLetters(text) {
+  const decomposed = String(text ?? '').normalize('NFKC').normalize('NFD');
+  let letters = '';
+  let ignored = 0;
+  for (const ch of decomposed) {
+    if (/\p{M}/u.test(ch) || /\s/u.test(ch)) continue;
+    const up = ch.toUpperCase();
+    // ß → SS のように、大文字にすると英字の並びになるものはそのまま使う
+    if (/^[A-Z]+$/.test(up)) letters += up;
+    else ignored += 1;
+  }
+  return { letters, ignored };
+}
+
+export function signature(word) {
+  return word.split('').sort().join('');
+}
+
+export function freqVector(word) {
+  const v = new Uint8Array(26);
+  for (let i = 0; i < word.length; i++) {
+    const k = word.charCodeAt(i) - 65;
+    if (k >= 0 && k < 26) v[k] += 1;
+  }
+  return v;
+}
+
+// need の各文字の個数が have 以下か（need の語を have の文字から作れるか）
+export function canCover(need, have) {
+  for (let i = 0; i < 26; i++) if (need[i] > have[i]) return false;
+  return true;
+}
+
+export function subtract(have, need) {
+  const out = new Uint8Array(26);
+  for (let i = 0; i < 26; i++) out[i] = have[i] - need[i];
+  return out;
+}
+
+// 頻度ベクトルを、その文字を並べた署名に戻す（[1,0,0,…,1] → "AZ"）
+export function vectorToSignature(v) {
+  let s = '';
+  for (let i = 0; i < 26; i++) if (v[i]) s += ALPHABET[i].repeat(v[i]);
+  return s;
+}
+
+// 辞書ファイルの本文を語の一覧にする。1行に1語、行の前後の空白は無視、英字でない文字は外す（a-dream → ADREAM）。
+// lines＝空でない行の数、invalid＝英字が1文字も残らなかった行、duplicates＝正規化すると前の行と同じになった行
+export function parseWordList(text) {
+  const seen = new Set();
+  let lines = 0;
+  let invalid = 0;
+  let duplicates = 0;
+  for (const raw of String(text ?? '').split(/\r\n|\n|\r/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    lines += 1;
+    const { letters } = normalizeLetters(line);
+    if (!letters) invalid += 1;
+    else if (seen.has(letters)) duplicates += 1;
+    else seen.add(letters);
+  }
+  return { words: [...seen], lines, invalid, duplicates };
+}
+
+// 複数の辞書（語の配列の配列）を1つの索引にまとめる。同じ語は1つにする
+export function buildIndex(wordLists) {
+  const words = [];
+  const seen = new Set();
+  for (const list of wordLists) {
+    for (const w of list) {
+      if (!w || seen.has(w)) continue;
+      seen.add(w);
+      words.push(w);
+    }
+  }
+  const bySignature = new Map();
+  const freq = new Map();
+  for (const w of words) {
+    const sig = signature(w);
+    if (!bySignature.has(sig)) bySignature.set(sig, []);
+    bySignature.get(sig).push(w);
+    freq.set(w, freqVector(w));
+  }
+  return { words, bySignature, freq };
+}
+
+// 画面の入力（文字列）から絞り込みの条件を作る。誤りは { ok: false, error: キー, ... } で返す（文言は messages.js）
+export function readFilters({ minLen = '', maxLen = '', startsWith = '', endsWith = '', contains = '' } = {}) {
+  const num = (s) => {
+    const t = String(s ?? '').trim();
+    if (t === '') return null;
+    return /^\d+$/.test(t) ? Number(t) : NaN;
+  };
+  const min = num(minLen);
+  const max = num(maxLen);
+  if (Number.isNaN(min) || (min !== null && (min < 1 || min > MAX_WORD_LENGTH))) return { ok: false, error: 'minLen', limit: MAX_WORD_LENGTH };
+  if (Number.isNaN(max) || (max !== null && (max < 1 || max > MAX_WORD_LENGTH))) return { ok: false, error: 'maxLen', limit: MAX_WORD_LENGTH };
+  const lo = min ?? 1;
+  const hi = max ?? MAX_WORD_LENGTH;
+  if (lo > hi) return { ok: false, error: 'range', min: lo, max: hi };
+  return {
+    ok: true,
+    filters: {
+      minLen: lo,
+      maxLen: hi,
+      startsWith: normalizeLetters(startsWith).letters,
+      endsWith: normalizeLetters(endsWith).letters,
+      contains: normalizeLetters(contains).letters
+    }
+  };
+}
+
+export function passFilters(word, f) {
+  if (word.length < f.minLen || word.length > f.maxLen) return false;
+  if (f.startsWith && !word.startsWith(f.startsWith)) return false;
+  if (f.endsWith && !word.endsWith(f.endsWith)) return false;
+  if (f.contains && !word.includes(f.contains)) return false;
+  return true;
+}
+
+const byWord = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+// 1語のアナグラム。kind＝exact（入力の文字をすべて使う）／partial（一部だけ使う）。rest＝使わずに残る文字（署名の形）
+// 並びは exact が先、次に長い語、同じ長さは ABC 順
+export function findSingle(index, letters, filters) {
+  const have = freqVector(letters);
+  const out = [];
+  for (const w of index.words) {
+    if (w.length > letters.length || !passFilters(w, filters)) continue;
+    const fv = index.freq.get(w);
+    if (!canCover(fv, have)) continue;
+    const rest = vectorToSignature(subtract(have, fv));
+    out.push({ word: w, kind: rest ? 'partial' : 'exact', rest });
+  }
+  out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'exact' ? -1 : 1) || b.word.length - a.word.length || byWord(a.word, b.word));
+  return out;
+}
+
+// 2語のアナグラム（入力の文字をちょうど使い切る組）。1語目 w1 を選ぶと、2語目の署名は「残りの文字」に決まるので、
+// 署名の索引を1回引けば2語目がすべて分かる＝辞書を1回なめるだけの全探索になる。
+// 組は ABC 順の2語で1回だけ数える。同じ語を2回使う組（MATE MATE）も含む。
+// 並びは短いほうの語が長い順（3字＋5字より4字＋4字を先に）、次に ABC 順
+export function findPairs(index, letters, filters) {
+  const have = freqVector(letters);
+  const seen = new Set();
+  const pairs = [];
+  let firstCandidates = 0;
+  for (const w1 of index.words) {
+    if (w1.length >= letters.length || !passFilters(w1, filters)) continue;
+    const fv = index.freq.get(w1);
+    if (!canCover(fv, have)) continue;
+    firstCandidates += 1;
+    const rest = vectorToSignature(subtract(have, fv));
+    for (const w2 of index.bySignature.get(rest) || []) {
+      if (!passFilters(w2, filters)) continue;
+      const words = w1 <= w2 ? [w1, w2] : [w2, w1];
+      const key = words.join(' ');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pairs.push({ words, length: letters.length });
+    }
+  }
+  const shorter = (p) => Math.min(p.words[0].length, p.words[1].length);
+  pairs.sort((a, b) => shorter(b) - shorter(a) || byWord(a.words.join(' '), b.words.join(' ')));
+  return { pairs, firstCandidates };
+}
+
+// 書き出し用。CSV は Excel で文字化けしないよう BOM つき・CRLF、すべての欄を引用符で囲む
+export function toCsv(header, rows) {
+  const cell = (v) => `"${String(v).replace(/"/g, '""')}"`;
+  return '\uFEFF' + [header, ...rows].map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
+}

@@ -1,332 +1,393 @@
+/* Anagram Hunter
+   色は変数で持ち、ライト（:root）とダーク（明示の切り替え＝data-theme、OS の設定＝prefers-color-scheme）で上書きする。
+   文字と背景の組は test/contrast.test.js が 4.5:1 以上（枠線は 3:1 以上）であることを確かめる */
+
 :root {
-  --bg: #ffffff;
-  --front: #1a1a1a;
-  --muted: #6b7280;
-  --card: #f9fafb;
-  --accent: #2563eb;
-  --border: #e5e7eb;
+  --bg-from: #f5f7fa;
+  --bg-to: #c3cfe2;
+  --text: #1a1a1a;
+  --muted: #4b5563;
+  --card: #ffffff;
+  --surface: #f3f4f6;
+  --divider: #e5e7eb;
+  --border: #6b7280;
+  --accent: #1e40af;
+  --accent-hover: #1e3a8a;
+  --on-accent: #ffffff;
+  --indicator-bg: #eff6ff;
+  --error: #b91c1c;
+  --note-bg: #fef3c7;
+  --note-text: #78350f;
+  --shadow: rgba(0, 0, 0, 0.08);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg-from: #0f172a;
+  --bg-to: #1e293b;
+  --text: #e5e7eb;
+  --muted: #a3acb9;
+  --card: #111827;
+  --surface: #1f2937;
+  --divider: #374151;
+  --border: #6b7280;
+  --accent: #60a5fa;
+  --accent-hover: #93c5fd;
+  --on-accent: #0b1220;
+  --indicator-bg: #172554;
+  --error: #fca5a5;
+  --note-bg: #422006;
+  --note-text: #fde68a;
+  --shadow: rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-from: #0f172a;
+    --bg-to: #1e293b;
+    --text: #e5e7eb;
+    --muted: #a3acb9;
+    --card: #111827;
+    --surface: #1f2937;
+    --divider: #374151;
+    --border: #6b7280;
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --on-accent: #0b1220;
+    --indicator-bg: #172554;
+    --error: #fca5a5;
+    --note-bg: #422006;
+    --note-text: #fde68a;
+    --shadow: rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
 }
 
 * { box-sizing: border-box; }
+
 html, body {
   margin: 0;
   padding: 0;
-  color: var(--front);
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%) no-repeat fixed;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, Helvetica, Arial;
 }
 
-.site-header { text-align: center; padding: 32px 16px 8px; }
-.site-header h1 { margin: 0 0 8px; font-size: 28px; }
+/* ページが画面より長いとき、グラデーションの外側も同じ系統の色にする */
+html { background: var(--bg-to); }
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--text);
+  background: linear-gradient(135deg, var(--bg-from) 0%, var(--bg-to) 100%) no-repeat fixed;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", Meiryo, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+}
+
+a { color: var(--accent); }
+a:hover { color: var(--accent-hover); }
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.04em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.hidden { display: none !important; }
+
+/* 起動できなかったときの案内（file:// と JavaScript 無効） */
+.boot-notice {
+  max-width: 900px;
+  margin: 16px auto;
+  padding: 12px 16px;
+  border: 2px solid var(--error);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+}
+
+/* ===== Header（タイトルは常に画面の中央、ボタンは右端。狭い幅ではタイトルの下） ===== */
+.site-header { padding: 24px 16px 8px; }
+
+.header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 8px;
+}
+
+.header-side[aria-hidden="true"] { display: none; }
+
+.hero { text-align: center; }
+.hero h1 { margin: 0 0 6px; font-size: 28px; line-height: 1.3; }
 .subtitle { margin: 0; color: var(--muted); }
 
-.container { max-width: 1100px; margin: 24px auto 64px; padding: 0 16px; }
-
-.card {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 18px;
-  margin-bottom: 18px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+@media (min-width: 769px) {
+  .header-inner {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+  }
+  .header-side[aria-hidden="true"] { display: block; }
+  .header-actions { justify-self: end; }
 }
 
-.row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
-.col { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-
-label { font-size: 14px; }
-input[type="number"], input[type="text"] {
-  background: white;
+.icon-btn {
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid var(--border);
-  color: var(--front);
-  border-radius: 10px;
-  padding: 8px 10px;
-  outline: none;
-}
-textarea { width: 100%; resize: vertical; border-radius: 12px; }
-
-.btn {
-  background: #f3f4f6;
-  color: var(--front);
-  border: 1px solid var(--border);
-  padding: 8px 12px;
   border-radius: 12px;
-  cursor: pointer;
-  transition: transform .05s ease, background .15s ease, border-color .15s ease;
-  font-weight: 600;
-}
-.btn:hover { transform: translateY(-1px); border-color: #9ca3af; background: #e5e7eb; }
-.btn-primary { background: var(--accent); color: white; border-color: transparent; }
-.btn-primary:hover { background: #1d4ed8; }
-.btn-secondary { background: #e5e7eb; }
-.btn-ghost { background: transparent; }
-
-.chk { display: inline-flex; align-items: center; gap: 6px; }
-
-.run-actions { 
-  display: flex;
-  flex-direction: column;
-  gap: 12px; 
-  margin: 16px 0;
-  padding: 16px;
-  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
-  border-radius: 12px;
-}
-
-.search-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.dict-indicator {
-  background: #f0f9ff;
-  border: 1px solid #bfdbfe;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.dict-name {
-  font-weight: 600;
-  color: var(--accent);
-}
-.status { color: var(--muted); }
-
-.result-actions { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-
-.result-filter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 20px;
   cursor: pointer;
 }
+.icon-btn:hover { border-color: var(--accent); }
 
-.result-filter input[type="checkbox"] {
-  margin: 0;
-  cursor: pointer;
-}
-.muted { color: var(--muted); }
+.container { max-width: 1100px; margin: 16px auto 48px; padding: 0 16px; }
 
-.table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 12px; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
-th { text-align: left; background: #f3f4f6; position: sticky; top: 0; z-index: 1; }
-tr:hover td { background: #f9fafb; }
-
-.dict-link {
-  text-decoration: none;
-  color: var(--muted);
-  font-size: 14px;
-  transition: color 0.2s;
-  display: inline-block;
-  width: 20px;
-  text-align: center;
-}
-
-.dict-link:hover {
-  color: var(--accent);
-  transform: scale(1.1);
-}
-
-/* Tab Navigation */
+/* ===== Tabs（狭い幅では折り返す） ===== */
 .tab-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 24px;
-  border-bottom: 2px solid var(--border);
-  padding-bottom: 0;
+  margin-bottom: 20px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--divider);
 }
 
 .tab-btn {
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   background: transparent;
-  border: none;
-  border-bottom: 3px solid transparent;
   color: var(--muted);
-  padding: 12px 24px;
+  font: inherit;
   font-size: 15px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
-  transition: color 0.2s, border-color 0.2s;
-  margin-bottom: -2px;
 }
-
-.tab-btn:hover {
-  color: var(--front);
-  transform: none;
-}
-
-.tab-btn.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-  background: transparent;
-}
-
-.tab-content {
-  display: none;
-}
-
-.tab-content.active {
-  display: block;
-}
-
-/* Dictionary info styles */
-.dictionary-info {
-  margin-top: 24px;
-  padding: 16px;
+.tab-btn:hover { color: var(--text); border-color: var(--border); }
+.tab-btn.active,
+.tab-btn[aria-selected="true"] {
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
-.dict-list-container {
-  margin-top: 12px;
+.tab-content[hidden] { display: none; }
+
+/* ===== Cards and fields ===== */
+.card {
+  background: var(--card);
+  border: 1px solid var(--divider);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 12px var(--shadow);
 }
+
+.card h2 { margin: 0 0 12px; font-size: 20px; }
+.card h3 { margin: 20px 0 8px; font-size: 16px; }
+.card > p { margin: 8px 0; }
+
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; min-width: 0; }
+.field label { font-size: 14px; font-weight: 600; }
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: 4px 16px;
+}
+
+.field-wide { flex: 1 1 320px; }
+
+.hint { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+
+input[type="number"],
+input[type="text"],
+textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+#letters,
+#lettersTwoWord { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; letter-spacing: 0.04em; }
+
+textarea { resize: vertical; min-height: 96px; }
+
+input[type="file"] { max-width: 100%; font: inherit; font-size: 16px; }
+
+::placeholder { color: var(--muted); opacity: 1; }
+
+/* ===== Buttons ===== */
+.btn {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-ghost { background: transparent; }
+.btn-small { min-height: 44px; padding: 4px 12px; font-size: 14px; }
+
+/* ===== Run area ===== */
+.run-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.search-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+.dict-indicator {
+  padding: 6px 12px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--indicator-bg);
+  color: var(--muted);
+  font-size: 14px;
+}
+.dict-name { font-weight: 600; color: var(--accent); }
+
+.status { margin: 0; min-height: 1.6em; color: var(--muted); }
+.status:empty { min-height: 0; }
+.status.error { color: var(--error); font-weight: 600; }
+
+/* ===== Results ===== */
+.summary { margin: 0 0 8px; }
+
+/* 長い辞書名・ファイル名・入力の文字列は、どこでも折り返せるようにする（表のセルは折り返さず、表の箱の中で横に送る） */
+.summary,
+.status,
+.stale-note,
+.dict-name,
+.dict-item-name,
+.dict-item-count { overflow-wrap: anywhere; }
+.stale-note {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--note-bg);
+  color: var(--note-text);
+}
+.stale-note[hidden] { display: none; }
+
+.result-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.check input { width: 20px; height: 20px; margin: 0; cursor: pointer; }
+
+.muted { color: var(--muted); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--divider); border-radius: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--divider); text-align: left; vertical-align: middle; }
+th, td { white-space: nowrap; }
+th { background: var(--surface); }
+
+.dict-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+/* ===== Dictionary settings ===== */
+.dict-list { list-style: none; margin: 0 0 8px; padding: 0; }
 
 .dict-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: 4px 12px;
+  padding: 6px 12px;
   margin-bottom: 8px;
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  background: var(--surface);
 }
 
 .dict-checkbox {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: 1;
+  gap: 10px;
+  flex: 1 1 260px;
+  min-height: 44px;
   cursor: pointer;
 }
+.dict-checkbox input { width: 20px; height: 20px; margin: 0; flex: none; cursor: pointer; }
+.dict-checkbox input:disabled { cursor: not-allowed; }
 
-.dict-checkbox input[type="checkbox"] {
-  margin: 0;
-  cursor: pointer;
+.dict-item-name { font-weight: 600; }
+.dict-item-kind { font-size: 14px; color: var(--accent); font-weight: 600; }
+.dict-item-count { font-size: 14px; color: var(--muted); }
+
+.dictionary-info {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  background: var(--surface);
 }
+.dictionary-info h3 { margin-top: 0; }
+.dictionary-info p { margin: 4px 0; }
+.dictionary-info strong { color: var(--accent); }
 
-.dict-item-name {
-  font-weight: 600;
-}
+.add-dict { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin-bottom: 12px; }
+.add-dict .field { margin-bottom: 0; }
+.add-dict .btn { margin-bottom: 0; }
 
-.dict-item-count {
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.dict-item-status {
-  color: var(--accent);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.btn-small {
-  padding: 4px 8px;
-  font-size: 13px;
-}
-
-.dictionary-info h3, .dictionary-help h3 {
-  margin-top: 0;
-  margin-bottom: 12px;
-  font-size: 16px;
-  color: var(--front);
-}
-
-.dictionary-info p {
-  margin: 8px 0;
-}
-
-.dictionary-info span {
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.dictionary-help {
-  margin-top: 24px;
-}
-
-.dictionary-help ul {
-  margin: 12px 0;
-  padding-left: 24px;
-}
-
-.dictionary-help li {
-  margin: 6px 0;
-  color: var(--muted);
-}
-
-/* Help icon and tooltip styles */
-.help-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin-left: 4px;
-  background: #e5e7eb;
-  color: #6b7280;
-  border-radius: 50%;
-  font-size: 12px;
-  font-weight: bold;
-  cursor: help;
-  position: relative;
-  user-select: none;
-  transition: background 0.2s, color 0.2s;
-}
-
-.help-icon:hover {
-  background: #2563eb;
-  color: white;
-}
-
-.help-icon::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1f2937;
-  color: white;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: normal;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
-  z-index: 1000;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.help-icon::before {
-  content: '';
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-width: 4px;
-  border-style: solid;
-  border-color: #1f2937 transparent transparent transparent;
-  opacity: 0;
-  transition: opacity 0.2s;
-  z-index: 1001;
-}
-
-.help-icon:hover::after,
-.help-icon:hover::before {
-  opacity: 1;
-}
-
-footer { margin: 40px 0; }
+/* ===== Footer ===== */
 .footer {
+  margin: 32px 16px 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
   text-align: center;
-  color: var(--muted);
-  padding: 12px 0;
-  border-top: 1px solid var(--border);
+  color: var(--text);
+}
+.footer p { margin: 4px 0; }
+
+@media (max-width: 480px) {
+  .hero h1 { font-size: 24px; }
+  .card { padding: 14px; }
+  .tab-btn { padding: 8px 14px; }
+  th, td { padding: 6px 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; scroll-behavior: auto !important; }
 }

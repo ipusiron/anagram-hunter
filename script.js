@@ -1,636 +1,439 @@
-// Anagram Hunter - by ipusiron (project scaffold)
+// Anagram Hunter - by ipusiron
 // MIT License
+// 画面の処理（ES module）。探索のロジックは js/anagram-core.js、辞書の一覧は js/wordlists.js、文言は js/messages.js
+
+import {
+  normalizeLetters, parseWordList, buildIndex, readFilters, findSingle, findPairs, signature, toCsv, MAX_INPUT_LETTERS
+} from './js/anagram-core.js';
+import {
+  BUILTIN_WORDS, BUNDLED_WORDLISTS, DEFAULT_WORDLISTS, MAX_FILE_BYTES, MAX_DICTIONARY_WORDS, displayName
+} from './js/wordlists.js';
+import { t } from './js/messages.js';
+import { initThemeToggle } from './js/theme.js';
+import { initTabs } from './js/tabs.js';
 
 // ===== Utilities =====
-const $  = (sel) => document.querySelector(sel);
-const $$ = (sel) => Array.from(document.querySelectorAll(sel));
-const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const $ = (sel) => document.querySelector(sel);
+const fmt = (n) => Number(n).toLocaleString();
+const MAX_LIMIT = 10000;
+const IS_FILE = window.location.protocol === 'file:';
 
-function sanitizeLetters(s) {
-  return (s || "").toUpperCase().replace(/[^A-Z]/g, "");
-}
-
-function freqVecFromString(s) {
-  const v = new Array(26).fill(0);
-  for (const ch of s) {
-    const i = ch.charCodeAt(0) - 65;
-    if (i >= 0 && i < 26) v[i]++;
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') node.className = v;
+    else if (k === 'text') node.textContent = v;
+    else if (k in node) node[k] = v;
+    else node.setAttribute(k, v);
   }
-  return v;
+  for (const c of children) node.append(c);
+  return node;
 }
 
-function canCover(need, have) {
-  // need <= have (component-wise)
-  for (let i = 0; i < 26; i++) if (need[i] > have[i]) return false;
-  return true;
+function setStatus(node, text, isError = false) {
+  node.textContent = text;
+  node.classList.toggle('error', isError);
 }
 
-function subVec(a, b) {
-  const out = new Array(26);
-  for (let i = 0; i < 26; i++) out[i] = a[i] - b[i];
-  return out;
-}
-
-function isZeroVec(v) {
-  for (let i = 0; i < 26; i++) if (v[i] !== 0) return false;
-  return true;
-}
-
-function toSignature(s) {
-  return s.split("").sort().join("");
-}
-
-// ===== Dictionary structures =====
-// We keep both: signature map and freq cache
-let WORDS = [];                // normalized words
-let SIG2WORDS = new Map();     // signature(string) -> string[]
-let WORD_FREQ = new Map();     // word -> 26-dim freq vector (cached)
-let DICT_SOURCES = [];         // Array of {name: string, words: string[], enabled: boolean}
-let BUILTIN_ENABLED = true;   // Built-in dictionary enabled state
-
-// Tiny built-in demo words (very small)
-const MINI_WORDS = [
-  "LISTEN","SILENT","ENLIST","INLETS",
-  "STONE","NOTES","TONES",
-  "APPLE","PEAL","PALE","LEAP","PEAL","PLEA",
-  "TEAM","MEAT","MATE","TAME",
-  "RATE","TEAR","TARE"
+// ===== Dictionary sources =====
+// kind: builtin（内蔵）／bundled（付属、fetch で読む）／file（ファイル選択）／paste（貼り付け）
+// words は正規化と重複除去のあとの配列。bundled は読み込むまで null
+const sources = [
+  { key: 'builtin', kind: 'builtin', name: t('dict.builtin'), words: BUILTIN_WORDS, lines: BUILTIN_WORDS.length, duplicates: 0, invalid: 0,
+    enabled: true }
 ];
+for (const w of BUNDLED_WORDLISTS) {
+  sources.push({ key: `bundled:${w.id}`, kind: 'bundled', id: w.id, file: w.file, name: t(`dict.bundled.${w.id}`), words: null,
+    expected: w.words, lines: w.lines, enabled: false, loading: false });
+}
+let pasteCount = 0;
+let userCount = 0;
+let index = buildIndex([]);
 
-function rebuildDictStructures() {
-  WORDS = [];
-  SIG2WORDS.clear();
-  WORD_FREQ.clear();
+function enabledSources() {
+  return sources.filter((s) => s.enabled && s.words);
+}
 
-  const seen = new Set();
-  
-  // Include built-in dictionary if enabled
-  if (BUILTIN_ENABLED) {
-    for (const raw of MINI_WORDS) {
-      const w = sanitizeLetters(raw);
-      if (!w) continue;
-      if (seen.has(w)) continue;
-      seen.add(w);
-      WORDS.push(w);
+function rebuildIndex(focusKey = null) {
+  index = buildIndex(enabledSources().map((s) => s.words));
+  $('#wordCount').textContent = fmt(index.words.length);
+  $('#signatureCount').textContent = fmt(index.bySignature.size);
+  const names = enabledSources().map((s) => s.name);
+  const loading = sources.some((s) => s.loading);
+  const text = names.length ? names.join(', ') : t('dict.none');
+  for (const node of [$('#dictNameSingle'), $('#dictNameTwoWord')]) node.textContent = loading ? `${text} ${t('dict.loading')}` : text;
+  markStale();
+  renderDictionaryList(focusKey);
+}
+
+function kindLabel(s) {
+  return t({ builtin: 'dict.kindBuiltin', bundled: 'dict.kindBundled', file: 'dict.kindFile', paste: 'dict.kindPaste' }[s.kind]);
+}
+
+// 語数の表示。重複や英字のない行を除いたときは、元の行数と除いた行数を添える
+function wordCountText(s) {
+  const removed = [];
+  if (s.duplicates) removed.push(t('dict.removedDuplicates', { n: fmt(s.duplicates) }));
+  if (s.invalid) removed.push(t('dict.removedInvalid', { n: fmt(s.invalid) }));
+  if (!removed.length) return t('dict.words', { n: fmt(s.words.length) });
+  return t('dict.wordsDetail', { n: fmt(s.words.length), lines: fmt(s.lines), removed: removed.join(t('dict.removedJoin')) });
+}
+
+// 一覧は描き直すので、フォーカスがあったチェックボックスは描き直したあとの同じ項目へ戻す（キーボードで操作を続けられるように）
+function renderDictionaryList(focusKey = null) {
+  const list = $('#dictListContainer');
+  const active = document.activeElement;
+  const keep = focusKey || (active && list.contains(active) && active.dataset.key) || null;
+  list.replaceChildren();
+  for (const s of sources) {
+    const box = el('input', { type: 'checkbox', checked: s.enabled, disabled: s.loading || (s.kind === 'bundled' && IS_FILE) });
+    box.dataset.key = s.key;
+    let count;
+    if (s.loading) count = t('dict.loading');
+    else if (!s.words) count = t('dict.notLoaded', { n: fmt(s.expected) });
+    else if (s.kind === 'builtin') count = t('dict.words', { n: fmt(s.words.length) });
+    else count = wordCountText(s);
+    const label = el('label', { class: 'dict-checkbox' }, [box, el('span', { class: 'dict-item-name', text: s.name })]);
+    const item = el('li', { class: 'dict-item' }, [
+      label,
+      el('span', { class: 'dict-item-kind', text: kindLabel(s) }),
+      el('span', { class: 'dict-item-count', text: count })
+    ]);
+    if (s.kind === 'file' || s.kind === 'paste') {
+      const remove = el('button', { type: 'button', class: 'btn btn-ghost btn-small', text: t('dict.remove') });
+      remove.dataset.remove = s.key;
+      remove.setAttribute('aria-label', t('dict.removeLabel', { name: s.name }));
+      item.append(remove);
     }
+    list.append(item);
   }
-  
-  // Add words from enabled dictionaries only
-  for (const dict of DICT_SOURCES) {
-    if (!dict.enabled) continue;
-    for (const raw of dict.words) {
-      const w = sanitizeLetters(raw);
-      if (!w) continue;
-      if (seen.has(w)) continue;
-      seen.add(w);
-      WORDS.push(w);
-    }
-  }
-
-  // Build signature and frequency maps
-  for (const w of WORDS) {
-    const sig = toSignature(w);
-    if (!SIG2WORDS.has(sig)) SIG2WORDS.set(sig, []);
-    SIG2WORDS.get(sig).push(w);
-    WORD_FREQ.set(w, freqVecFromString(w));
+  if (keep) {
+    const again = [...list.querySelectorAll('input[data-key]')].find((x) => x.dataset.key === keep);
+    if (again) again.focus();
   }
 }
 
-function updateDictionaryStats() {
-  $("#wordCount").textContent = WORDS.length.toLocaleString();
-  $("#signatureCount").textContent = SIG2WORDS.size.toLocaleString();
-}
-
-function updateDictionaryDisplay() {
-  // Create display text for enabled dictionaries only
-  const enabledDictNames = [];
-  if (BUILTIN_ENABLED) {
-    enabledDictNames.push("内蔵ミニ辞書");
-  }
-  enabledDictNames.push(...DICT_SOURCES.filter(d => d.enabled).map(d => d.name));
-  const displayText = enabledDictNames.length > 0 ? enabledDictNames.join(", ") : "辞書未選択";
-  
-  // Update all dictionary name displays
-  const dictDisplays = $$(".dict-name");
-  dictDisplays.forEach(el => {
-    el.textContent = displayText;
-  });
-  
-  const currentDictInfo = $("#currentDictInfo");
-  if (currentDictInfo) {
-    currentDictInfo.textContent = displayText;
-  }
-  
-  // Update dictionary list in settings (only if DOM is ready)
-  if (document.readyState === 'loading') {
-    console.log("DOM not ready, skipping dictionary list update");
-  } else {
-    updateDictionaryList();
+async function loadBundled(source) {
+  source.loading = true;
+  rebuildIndex();
+  try {
+    const resp = await fetch(source.file);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const parsed = parseWordList(await resp.text());
+    Object.assign(source, { words: parsed.words, lines: parsed.lines, duplicates: parsed.duplicates, invalid: parsed.invalid, enabled: true });
+    return true;
+  } catch (e) {
+    source.enabled = false;
+    setStatus($('#dictStatus'), t('dict.errorFetch', { name: source.name, detail: e.message }), true);
+    return false;
+  } finally {
+    source.loading = false;
   }
 }
 
-function updateDictionaryList() {
-  const listContainer = $("#dictListContainer");
-  if (!listContainer) {
-    console.log("dictListContainer not found, skipping update");
+async function toggleSource(key, on) {
+  const s = sources.find((x) => x.key === key);
+  if (!s) return;
+  if (on && !s.words && s.kind === 'bundled') {
+    const ok = await loadBundled(s);
+    rebuildIndex(key);
+    if (ok) setStatus($('#dictStatus'), t('dict.statusLoaded', { name: s.name, n: fmt(s.words.length), total: fmt(index.words.length) }));
     return;
   }
-  
-  listContainer.innerHTML = "";
-  
-  // Built-in dictionary (always present)
-  const builtInItem = document.createElement("div");
-  builtInItem.className = "dict-item";
-  builtInItem.innerHTML = `
-    <label class="dict-checkbox">
-      <input type="checkbox" ${BUILTIN_ENABLED ? 'checked' : ''} onchange="toggleBuiltinDictionary(this.checked)">
-      <span class="dict-item-name">内蔵ミニ辞書</span>
-    </label>
-    <span class="dict-item-count">${MINI_WORDS.length} 語</span>
-    <span class="dict-item-status">標準</span>
-  `;
-  listContainer.appendChild(builtInItem);
-  
-  // Loaded dictionaries
-  DICT_SOURCES.forEach((dict, index) => {
-    const item = document.createElement("div");
-    item.className = "dict-item";
-    item.innerHTML = `
-      <label class="dict-checkbox">
-        <input type="checkbox" ${dict.enabled ? 'checked' : ''} onchange="toggleDictionary(${index}, this.checked)">
-        <span class="dict-item-name">${dict.name}</span>
-      </label>
-      <span class="dict-item-count">${dict.words.length} 語</span>
-      <button class="btn btn-ghost btn-small" onclick="removeDictionary(${index})">削除</button>
-    `;
-    listContainer.appendChild(item);
-  });
+  s.enabled = on;
+  rebuildIndex();
+  setStatus($('#dictStatus'), t('dict.statusToggled', { total: fmt(index.words.length) }));
 }
 
-function addDictionary(text, sourceName = "カスタム辞書") {
-  const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  
-  // Check if dictionary with same name already exists
-  const existingIndex = DICT_SOURCES.findIndex(d => d.name === sourceName);
-  if (existingIndex !== -1) {
-    // Replace existing dictionary but keep enabled state
-    DICT_SOURCES[existingIndex] = { 
-      name: sourceName, 
-      words: lines, 
-      enabled: DICT_SOURCES[existingIndex].enabled 
-    };
+// 利用者の辞書を足す。同じ名前があれば中身を置き換える（使う／使わないの状態は引き継ぐ）
+function addUserDictionary(kind, name, text) {
+  const parsed = parseWordList(text);
+  if (!parsed.words.length) return setStatus($('#dictStatus'), t('dict.errorEmpty'), true);
+  if (parsed.words.length > MAX_DICTIONARY_WORDS) {
+    return setStatus($('#dictStatus'), t('dict.errorTooManyWords', { n: fmt(parsed.words.length), limit: fmt(MAX_DICTIONARY_WORDS) }), true);
+  }
+  const existing = sources.find((s) => (s.kind === 'file' || s.kind === 'paste') && s.name === name);
+  const fields = { words: parsed.words, lines: parsed.lines, duplicates: parsed.duplicates, invalid: parsed.invalid };
+  if (existing) {
+    Object.assign(existing, fields);
   } else {
-    // Add new dictionary (enabled by default)
-    DICT_SOURCES.push({ name: sourceName, words: lines, enabled: true });
+    userCount += 1;
+    sources.push({ key: `${kind}:${userCount}`, kind, name, enabled: true, ...fields });
   }
-  
-  rebuildDictStructures();
-  updateDictionaryStats();
-  updateDictionaryDisplay();
-  
-  const totalWords = WORDS.length;
-  $("#dictStatus").textContent = `辞書：合計 ${totalWords.toLocaleString()} 語を読み込み`;
+  rebuildIndex();
+  const msg = existing ? 'dict.statusReplaced' : 'dict.statusLoaded';
+  setStatus($('#dictStatus'), t(msg, { name, n: fmt(parsed.words.length), total: fmt(index.words.length) }));
 }
 
-window.toggleBuiltinDictionary = function(enabled) {
-  BUILTIN_ENABLED = enabled;
-  rebuildDictStructures();
-  updateDictionaryStats();
-  updateDictionaryDisplay();
-  
-  const totalWords = WORDS.length;
-  $("#dictStatus").textContent = `辞書：合計 ${totalWords.toLocaleString()} 語を使用中`;
+function formatBytes(n) {
+  return n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${Math.ceil(n / 1024)}KB`;
 }
 
-window.toggleDictionary = function(index, enabled) {
-  if (index >= 0 && index < DICT_SOURCES.length) {
-    DICT_SOURCES[index].enabled = enabled;
-    rebuildDictStructures();
-    updateDictionaryStats();
-    updateDictionaryDisplay();
-    
-    const totalWords = WORDS.length;
-    $("#dictStatus").textContent = `辞書：合計 ${totalWords.toLocaleString()} 語を使用中`;
-  }
-}
-
-window.removeDictionary = function(index) {
-  if (index >= 0 && index < DICT_SOURCES.length) {
-    DICT_SOURCES.splice(index, 1);
-    rebuildDictStructures();
-    updateDictionaryStats();
-    updateDictionaryDisplay();
-    
-    const totalWords = WORDS.length;
-    $("#dictStatus").textContent = `辞書：合計 ${totalWords.toLocaleString()} 語を読み込み`;
-  }
-}
-
-// Initialize with built-in dictionary (will be called after DOM loads)
-
-// ===== Filters =====
-function buildFilters() {
-  const minLen = Math.max(1, parseInt($("#minLen").value, 10) || 1);
-  const maxLen = Math.max(minLen, parseInt($("#maxLen").value, 10) || 99);
-  const sw = sanitizeLetters($("#startsWith").value);
-  const ew = sanitizeLetters($("#endsWith").value);
-  const contains = sanitizeLetters($("#contains").value);
-
-  return {
-    minLen, maxLen, sw, ew, contains
-  };
-}
-
-function buildFiltersTwoWord() {
-  const minLen = Math.max(1, parseInt($("#minLenTwoWord").value, 10) || 1);
-  const maxLen = Math.max(minLen, parseInt($("#maxLenTwoWord").value, 10) || 99);
-  const sw = sanitizeLetters($("#startsWithTwoWord").value);
-  const ew = sanitizeLetters($("#endsWithTwoWord").value);
-  const contains = sanitizeLetters($("#containsTwoWord").value);
-
-  return {
-    minLen, maxLen, sw, ew, contains
-  };
-}
-
-function passFilters(word, f) {
-  if (word.length < f.minLen || word.length > f.maxLen) return false;
-
-  // startsWith (simple literal, uppercase)
-  if (f.sw && !word.startsWith(f.sw)) return false;
-  // endsWith
-  if (f.ew && !word.endsWith(f.ew)) return false;
-  // contains
-  if (f.contains && !word.includes(f.contains)) return false;
-
-  return true;
-}
-
-// ===== Single-word anagram =====
-function anagramsOneWord(letters, filters) {
-  // Using signature first for exact-length matches:
-  const sig = toSignature(letters);
-  const exactList = SIG2WORDS.get(sig) || [];
-  const outExact = exactList.filter(w => passFilters(w, filters));
-
-  // For variable-length (sub-anagrams), do a cover check using frequency:
-  const have = freqVecFromString(letters);
-  const outSub = [];
-  for (const w of WORDS) {
-    const fv = WORD_FREQ.get(w);
-    if (!canCover(fv, have)) continue;
-    if (!passFilters(w, filters)) continue;
-    outSub.push(w);
-  }
-
-  // Combine and unique; annotate type
-  const set = new Set();
-  const res = [];
-
-  for (const w of outExact) {
-    if (!set.has(w)) { res.push({ kind: "1語(完全変位)", word: w }); set.add(w); }
-  }
-  for (const w of outSub) {
-    if (!set.has(w)) { res.push({ kind: "1語(部分使用)", word: w }); set.add(w); }
-  }
-
-  // Sort: exact first, then length desc, then lex
-  res.sort((a,b) => {
-    const rk = (a.kind === "1語(完全変位)" ? 0 : 1) - (b.kind === "1語(完全変位)" ? 0 : 1);
-    if (rk !== 0) return rk;
-    const dl = b.word.length - a.word.length;
-    if (dl !== 0) return dl;
-    return a.word.localeCompare(b.word);
+// ===== Search =====
+// 入力欄から文字列・絞り込み・表示の上限を読む。誤りは { error } で返す
+function readForm(ids) {
+  const { letters, ignored } = normalizeLetters($(ids.letters).value);
+  if (!letters) return { error: t('input.empty') };
+  if (letters.length > MAX_INPUT_LETTERS) return { error: t('input.tooLong', { n: letters.length, limit: MAX_INPUT_LETTERS }) };
+  // 数の欄に数でない文字（1e など）を打つと、ブラウザーは value を空にして badInput を立てる。空欄（制限なし）と区別する
+  const num = (sel) => ($(sel).validity && $(sel).validity.badInput ? 'invalid' : $(sel).value);
+  const f = readFilters({
+    minLen: num(ids.minLen), maxLen: num(ids.maxLen),
+    startsWith: $(ids.startsWith).value, endsWith: $(ids.endsWith).value, contains: $(ids.contains).value
   });
-  return res;
+  if (!f.ok) return { error: t(`filter.${f.error}`, f) };
+  const rawLimit = String(num(ids.limit)).trim();
+  const limit = rawLimit === '' ? 200 : /^\d+$/.test(rawLimit) ? Number(rawLimit) : NaN;
+  if (!(limit >= 1 && limit <= MAX_LIMIT)) return { error: t('limit.invalid', { limit: fmt(MAX_LIMIT) }) };
+  if (!index.words.length) return { error: t('search.noDictionary') };
+  return { letters, ignored, filters: f.filters, limit };
 }
 
-// ===== Two-word anagram (educational MVP) =====
-function anagramsTwoWords(letters, filters, beamWidth = 200, topN = 200) {
-  const have = freqVecFromString(letters);
+const SINGLE = {
+  letters: '#letters', minLen: '#minLen', maxLen: '#maxLen', startsWith: '#startsWith', endsWith: '#endsWith', contains: '#contains',
+  limit: '#limitSingle', status: '#statusSingle', summary: '#summarySingle', stale: '#staleSingle', info: '#resultInfoSingle',
+  tbody: '#resultTableSingle tbody'
+};
+const PAIR = {
+  letters: '#lettersTwoWord', minLen: '#minLenTwoWord', maxLen: '#maxLenTwoWord', startsWith: '#startsWithTwoWord',
+  endsWith: '#endsWithTwoWord', contains: '#containsTwoWord', limit: '#topN', status: '#statusTwoWord', summary: '#summaryTwoWord',
+  stale: '#staleTwoWord', info: '#resultInfoTwoWord', tbody: '#resultTableTwoWord tbody'
+};
+const state = { single: null, pair: null };
 
-  // Step 1: candidate1 filter by cover and filters
-  const cand1 = [];
-  for (const w of WORDS) {
-    const fv = WORD_FREQ.get(w);
-    if (!canCover(fv, have)) continue;
-    if (!passFilters(w, filters)) continue;
-    cand1.push(w);
-  }
-
-  // Light scoring: prefer longer words first (heuristic)
-  cand1.sort((a,b) => b.length - a.length || a.localeCompare(b));
-  const beams = cand1.slice(0, beamWidth);
-
-  // Step 2: for each beam, try to complete with word2
-  const results = [];
-  outer:
-  for (const w1 of beams) {
-    const rem = subVec(have, WORD_FREQ.get(w1));
-    // fast upper bound: rem length
-    const remLen = rem.reduce((s,x) => s + x, 0);
-
-    for (const w2 of WORDS) {
-      if (w2 === w1) { /* allow same word only if fits twice? */ }
-      const fv2 = WORD_FREQ.get(w2);
-      if (!canCover(fv2, rem)) continue;
-      if (!passFilters(w2, filters)) continue;
-
-      const rem2 = subVec(rem, fv2);
-      if (!isZeroVec(rem2)) continue; // require exact cover for 2語完全変位
-
-      // Found pair
-      const pair = [w1, w2].sort(); // canonical
-      const key = pair.join(" ");
-      results.push({ kind: "2語(完全変位)", pair, len: pair[0].length + pair[1].length });
-      if (results.length >= topN) break outer;
-    }
-  }
-
-  // Unique + sort: by total length desc, then lex
-  const uniq = new Map();
-  for (const r of results) {
-    uniq.set(r.pair.join(" "), r);
-  }
-  const out = Array.from(uniq.values());
-  out.sort((a,b) => b.len - a.len || a.pair.join(" ").localeCompare(b.pair.join(" ")));
-  return out;
+function clearResults(ids, key) {
+  state[key] = null;
+  $(ids.tbody).replaceChildren();
+  $(ids.summary).textContent = '';
+  $(ids.info).textContent = '';
+  $(ids.stale).hidden = true;
 }
 
-// Store full results for filtering
-let FULL_SINGLE_RESULTS = [];
-let FULL_TWO_WORD_RESULTS = [];
-
-// ===== Results table & export =====
-function showSingleResults(results) {
-  FULL_SINGLE_RESULTS = results;
-  updateSingleResultsDisplay();
-}
-
-function updateSingleResultsDisplay() {
-  const tbody = $("#resultTableSingle tbody");
-  tbody.innerHTML = "";
-  
-  const showPartial = $("#showPartialSingle").checked;
-  const filteredResults = showPartial ? 
-    FULL_SINGLE_RESULTS : 
-    FULL_SINGLE_RESULTS.filter(r => r.kind === "1語(完全変位)");
-  
-  let rank = 1;
-  for (const r of filteredResults) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${rank++}</td>
-      <td><code>${r.word}</code></td>
-      <td>${r.kind}</td>
-      <td>${r.word.length}</td>
-      <td><a href="https://eow.alc.co.jp/search?q=${r.word}" target="_blank" rel="noopener noreferrer" class="dict-link" title="英辞郎で意味を調べる">🔍</a></td>
-    `;
-    tbody.appendChild(tr);
+// 辞書が変わったら、表示中の結果に「前の辞書の結果」と添える
+function markStale() {
+  for (const [key, ids] of [['single', SINGLE], ['pair', PAIR]]) {
+    if (!state[key]) continue;
+    const node = $(ids.stale);
+    node.textContent = t('result.stale');
+    node.hidden = false;
   }
+}
 
-  const totalCount = FULL_SINGLE_RESULTS.length;
-  const shownCount = filteredResults.length;
-  const hiddenCount = totalCount - shownCount;
-  
-  let infoText = `${shownCount} 件表示`;
-  if (hiddenCount > 0) {
-    infoText += ` (${hiddenCount} 件の部分一致を非表示)`;
+function lookupLink(query) {
+  const a = el('a', { href: `https://eow.alc.co.jp/search?q=${encodeURIComponent(query)}`, target: '_blank', rel: 'noopener noreferrer',
+    class: 'dict-link', text: '🔍' });
+  a.setAttribute('aria-label', t('result.lookup', { word: query }));
+  a.title = t('result.lookup', { word: query });
+  return a;
+}
+
+function runSingle() {
+  const status = $(SINGLE.status);
+  const form = readForm(SINGLE);
+  if (form.error) {
+    clearResults(SINGLE, 'single');
+    return setStatus(status, form.error, true);
   }
-  $("#resultInfoSingle").textContent = infoText;
-}
-
-function showTwoWordResults(results) {
-  FULL_TWO_WORD_RESULTS = results;
-  updateTwoWordResultsDisplay();
-}
-
-function updateTwoWordResultsDisplay() {
-  const tbody = $("#resultTableTwoWord tbody");
-  tbody.innerHTML = "";
-  
-  const showPartial = $("#showPartialTwoWord").checked;
-  // For two-word results, we only have complete anagrams, so no filtering needed for now
-  // But keeping the structure for consistency
-  const filteredResults = FULL_TWO_WORD_RESULTS;
-  
-  let rank = 1;
-  for (const r of filteredResults) {
-    const display = r.pair.join(" ");
-    const searchQuery = r.pair.join("%20");
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${rank++}</td>
-      <td><code>${display}</code></td>
-      <td>${r.kind}</td>
-      <td>${r.len}</td>
-      <td><a href="https://eow.alc.co.jp/search?q=${searchQuery}" target="_blank" rel="noopener noreferrer" class="dict-link" title="英辞郎で意味を調べる">🔍</a></td>
-    `;
-    tbody.appendChild(tr);
-  }
-
-  $("#resultInfoTwoWord").textContent = `${filteredResults.length} 件表示`;
-}
-
-function exportCSV(tableId, filename) {
-  const rows = [];
-  $$(tableId + " tbody tr").forEach(tr => {
-    const tds = tr.querySelectorAll("td");
-    rows.push([tds[0].innerText, tds[1].innerText, tds[2].innerText, tds[3].innerText]);
+  const results = findSingle(index, form.letters, form.filters);
+  state.single = { ...form, results };
+  $(SINGLE.stale).hidden = true;
+  const exact = results.filter((r) => r.kind === 'exact').length;
+  $(SINGLE.summary).textContent = t('result.singleSummary', {
+    letters: form.letters, len: form.letters.length, sig: signature(form.letters), exact: fmt(exact), partial: fmt(results.length - exact)
   });
-  const header = "rank,candidate,type,length\n";
-  const body = rows.map(r => r.map(x => `"${x.replace(/"/g,'""')}"`).join(",")).join("\n");
-  const blob = new Blob([header + body], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  setStatus(status, form.ignored ? t('input.ignored', { n: form.ignored }) : '');
+  renderSingle();
 }
 
-function exportJSON(tableId, filename) {
-  const data = [];
-  $$(tableId + " tbody tr").forEach(tr => {
-    const tds = tr.querySelectorAll("td");
-    data.push({
-      rank: Number(tds[0].innerText),
-      candidate: tds[1].innerText,
-      type: tds[2].innerText,
-      length: Number(tds[3].innerText)
-    });
-  });
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+function visibleSingle() {
+  if (!state.single) return [];
+  return $('#showPartialSingle').checked ? state.single.results : state.single.results.filter((r) => r.kind === 'exact');
 }
 
-// ===== Tab switching =====
-function initTabSwitching() {
-  const tabBtns = $$(".tab-btn");
-  const tabContents = $$(".tab-content");
-  
-  tabBtns.forEach(btn => {
-    btn.addEventListener("click", () => {
-      const tabName = btn.dataset.tab;
-      
-      // Update active states
-      tabBtns.forEach(b => b.classList.remove("active"));
-      tabContents.forEach(c => c.classList.remove("active"));
-      
-      btn.classList.add("active");
-      const content = document.querySelector(`.tab-content[data-tab="${tabName}"]`);
-      if (content) content.classList.add("active");
-    });
+function renderSingle() {
+  const tbody = $(SINGLE.tbody);
+  tbody.replaceChildren();
+  if (!state.single) return;
+  const rows = visibleSingle();
+  const shown = rows.slice(0, state.single.limit);
+  const frag = document.createDocumentFragment();
+  shown.forEach((r, i) => {
+    frag.append(el('tr', {}, [
+      el('td', { text: String(i + 1) }),
+      el('td', {}, [el('code', { text: r.word })]),
+      el('td', { text: t(`kind.${r.kind}`) }),
+      el('td', { text: String(r.word.length) }),
+      el('td', {}, [r.rest ? el('code', { text: r.rest }) : t('result.restNone')]),
+      el('td', {}, [lookupLink(r.word)])
+    ]));
   });
+  tbody.append(frag);
+  const hiddenPartial = state.single.results.length - rows.length;
+  let info = rows.length === 0 ? t('result.none')
+    : shown.length < rows.length ? t('result.shown', { total: fmt(rows.length), shown: fmt(shown.length) })
+      : t('result.shownAll', { total: fmt(rows.length) });
+  if (hiddenPartial > 0) info += t('result.hiddenPartial', { n: fmt(hiddenPartial) });
+  $(SINGLE.info).textContent = info;
+}
+
+function runPair() {
+  const status = $(PAIR.status);
+  const form = readForm(PAIR);
+  if (form.error) {
+    clearResults(PAIR, 'pair');
+    return setStatus(status, form.error, true);
+  }
+  const { pairs, firstCandidates } = findPairs(index, form.letters, form.filters);
+  state.pair = { ...form, pairs };
+  $(PAIR.stale).hidden = true;
+  $(PAIR.summary).textContent = t('result.pairSummary', {
+    letters: form.letters, len: form.letters.length, sig: signature(form.letters), pairs: fmt(pairs.length), first: fmt(firstCandidates)
+  });
+  setStatus(status, form.ignored ? t('input.ignored', { n: form.ignored }) : '');
+  renderPair();
+}
+
+function renderPair() {
+  const tbody = $(PAIR.tbody);
+  tbody.replaceChildren();
+  if (!state.pair) return;
+  const { pairs, limit } = state.pair;
+  const shown = pairs.slice(0, limit);
+  const frag = document.createDocumentFragment();
+  shown.forEach((p, i) => {
+    const phrase = p.words.join(' ');
+    frag.append(el('tr', {}, [
+      el('td', { text: String(i + 1) }),
+      el('td', {}, [el('code', { text: phrase })]),
+      el('td', { text: t('result.pairLengths', { a: p.words[0].length, b: p.words[1].length }) }),
+      el('td', {}, [lookupLink(phrase)])
+    ]));
+  });
+  tbody.append(frag);
+  $(PAIR.info).textContent = pairs.length === 0 ? t('result.none')
+    : shown.length < pairs.length ? t('result.shown', { total: fmt(pairs.length), shown: fmt(shown.length) })
+      : t('result.shownAll', { total: fmt(pairs.length) });
+}
+
+// ===== Export =====
+function download(text, filename, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = el('a', { href: url, download: filename });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+// 書き出しは表示の上限に関係なく全件（1語は「一部の文字を使う語も表示」の状態に合わせる）
+function singleRecords() {
+  return visibleSingle().map((r, i) => ({ rank: i + 1, candidate: r.word, type: r.kind, length: r.word.length, remaining: r.rest }));
+}
+
+function pairRecords() {
+  return (state.pair ? state.pair.pairs : []).map((p, i) => ({
+    rank: i + 1, candidate: p.words.join(' '), word1: p.words[0], word2: p.words[1], length: p.length
+  }));
+}
+
+function exportRecords(records, base, format, status) {
+  if (!records.length) return setStatus($(status), t('export.nothing'), true);
+  if (format === 'csv') {
+    const header = Object.keys(records[0]);
+    download(toCsv(header, records.map((r) => header.map((k) => r[k]))), `${base}.csv`, 'text/csv;charset=utf-8');
+  } else {
+    download(`${JSON.stringify(records, null, 2)}\n`, `${base}.json`, 'application/json');
+  }
 }
 
 // ===== Events =====
 function bindEvents() {
-  // Single word tab events
-  $("#normalizeBtn").addEventListener("click", () => {
-    const s = sanitizeLetters($("#letters").value);
-    $("#letters").value = s;
+  $('#formSingle').addEventListener('submit', (e) => {
+    e.preventDefault();
+    runSingle();
+  });
+  $('#clearBtn').addEventListener('click', () => {
+    $('#letters').value = '';
+    setStatus($(SINGLE.status), '');
+    clearResults(SINGLE, 'single');
+    $('#letters').focus();
+  });
+  $('#showPartialSingle').addEventListener('change', renderSingle);
+  $('#exportCsvSingleBtn').addEventListener('click', () => exportRecords(singleRecords(), 'single_anagram_results', 'csv', SINGLE.status));
+  $('#exportJsonSingleBtn').addEventListener('click', () => exportRecords(singleRecords(), 'single_anagram_results', 'json', SINGLE.status));
+
+  $('#formTwoWord').addEventListener('submit', (e) => {
+    e.preventDefault();
+    runPair();
+  });
+  $('#clearTwoWordBtn').addEventListener('click', () => {
+    $('#lettersTwoWord').value = '';
+    setStatus($(PAIR.status), '');
+    clearResults(PAIR, 'pair');
+    $('#lettersTwoWord').focus();
+  });
+  $('#exportCsvTwoWordBtn').addEventListener('click', () => exportRecords(pairRecords(), 'two_word_anagram_results', 'csv', PAIR.status));
+  $('#exportJsonTwoWordBtn').addEventListener('click', () => exportRecords(pairRecords(), 'two_word_anagram_results', 'json', PAIR.status));
+
+  // 辞書の一覧（項目は描き直すので、親で受ける）
+  $('#dictListContainer').addEventListener('change', (e) => {
+    const key = e.target.dataset && e.target.dataset.key;
+    if (key) toggleSource(key, e.target.checked);
+  });
+  $('#dictListContainer').addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-remove]');
+    if (!button) return;
+    const i = sources.findIndex((s) => s.key === button.dataset.remove);
+    if (i < 0) return;
+    const [removed] = sources.splice(i, 1);
+    rebuildIndex();
+    // 外した項目の位置にある項目（なければ1つ前）へフォーカスを移す
+    const next = sources[Math.min(i, sources.length - 1)];
+    if (next) renderDictionaryList(next.key);
+    setStatus($('#dictStatus'), t('dict.statusRemoved', { name: removed.name, total: fmt(index.words.length) }));
   });
 
-  $("#clearBtn").addEventListener("click", () => {
-    $("#letters").value = "";
-    $("#statusSingle").textContent = "";
-    $("#resultInfoSingle").textContent = "";
-    $("#resultTableSingle tbody").innerHTML = "";
-  });
-
-  $("#runSingleBtn").addEventListener("click", () => {
-    $("#statusSingle").textContent = "探索中...";
-    setTimeout(() => {
-      try {
-        const letters = sanitizeLetters($("#letters").value);
-        if (!letters) throw new Error("文字列を入力してください（A–Z）");
-
-        const filters = buildFilters();
-
-        // 長すぎチェック
-        if (letters.length > filters.maxLen) {
-          throw new Error(`入力が長すぎます（最大長: ${filters.maxLen}）`);
-        }
-
-        const results = anagramsOneWord(letters, filters);
-        showSingleResults(results);
-        $("#statusSingle").textContent = "完了";
-      } catch (e) {
-        $("#statusSingle").textContent = `エラー: ${e.message}`;
-      }
-    }, 0);
-  });
-
-  $("#exportCsvSingleBtn").addEventListener("click", () => {
-    exportCSV("#resultTableSingle", "single_anagram_results.csv");
-  });
-  $("#exportJsonSingleBtn").addEventListener("click", () => {
-    exportJSON("#resultTableSingle", "single_anagram_results.json");
-  });
-
-  // Partial match filter for single word results
-  $("#showPartialSingle").addEventListener("change", () => {
-    updateSingleResultsDisplay();
-  });
-
-  // Two word tab events
-  $("#normalizeTwoWordBtn").addEventListener("click", () => {
-    const s = sanitizeLetters($("#lettersTwoWord").value);
-    $("#lettersTwoWord").value = s;
-  });
-
-  $("#clearTwoWordBtn").addEventListener("click", () => {
-    $("#lettersTwoWord").value = "";
-    $("#statusTwoWord").textContent = "";
-    $("#resultInfoTwoWord").textContent = "";
-    $("#resultTableTwoWord tbody").innerHTML = "";
-  });
-
-  $("#runTwoWordBtn").addEventListener("click", () => {
-    $("#statusTwoWord").textContent = "探索中...";
-    setTimeout(() => {
-      try {
-        const letters = sanitizeLetters($("#lettersTwoWord").value);
-        if (!letters) throw new Error("文字列を入力してください（A–Z）");
-
-        const filters = buildFiltersTwoWord();
-
-        // 長すぎチェック（2語時の最大合計長）
-        if (letters.length > filters.maxLen * 2) {
-          throw new Error(`入力が長すぎます（2語時の最大合計長: ${filters.maxLen * 2}）`);
-        }
-
-        const bw = Math.max(1, parseInt($("#beamWidth").value, 10) || 200);
-        const topN = Math.max(1, parseInt($("#topN").value, 10) || 200);
-        const results = anagramsTwoWords(letters, filters, bw, topN);
-        showTwoWordResults(results);
-        $("#statusTwoWord").textContent = "完了";
-      } catch (e) {
-        $("#statusTwoWord").textContent = `エラー: ${e.message}`;
-      }
-    }, 0);
-  });
-
-  $("#exportCsvTwoWordBtn").addEventListener("click", () => {
-    exportCSV("#resultTableTwoWord", "two_word_anagram_results.csv");
-  });
-  $("#exportJsonTwoWordBtn").addEventListener("click", () => {
-    exportJSON("#resultTableTwoWord", "two_word_anagram_results.json");
-  });
-
-  // Partial match filter for two word results
-  $("#showPartialTwoWord").addEventListener("change", () => {
-    updateTwoWordResultsDisplay();
-  });
-
-  // Wordlist via file
-  $("#loadWordlistBtn").addEventListener("click", async () => {
-    const fi = $("#wordlistFile");
-    if (!fi.files || fi.files.length === 0) {
-      $("#dictStatus").textContent = "辞書ファイルを選択してください";
-      return;
+  $('#loadWordlistBtn').addEventListener('click', async () => {
+    const input = $('#wordlistFile');
+    const file = input.files && input.files[0];
+    if (!file) return setStatus($('#dictStatus'), t('dict.errorNoFile'), true);
+    if (file.size > MAX_FILE_BYTES) {
+      return setStatus($('#dictStatus'), t('dict.errorTooLarge', { size: formatBytes(file.size), limit: formatBytes(MAX_FILE_BYTES) }), true);
     }
     try {
-      const text = await fi.files[0].text();
-      const filename = fi.files[0].name;
-      addDictionary(text, filename);
-      $("#dictStatus").textContent = "辞書読み込みOK";
-      fi.value = ""; // Clear file input for next selection
+      addUserDictionary('file', displayName(file.name) || 'wordlist.txt', await file.text());
+      input.value = '';
     } catch (e) {
-      $("#dictStatus").textContent = `辞書読み込み失敗: ${e.message}`;
+      setStatus($('#dictStatus'), t('dict.errorRead', { detail: e.message }), true);
     }
   });
 
-  // Wordlist via fetch (relative path on Pages)
-  $("#fetchWordlistBtn").addEventListener("click", async () => {
-    const path = $("#wordlistPath").value.trim();
-    if (!path) {
-      $("#dictStatus").textContent = "相対パスを入力してください";
-      return;
-    }
-    try {
-      const resp = await fetch(path);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const text = await resp.text();
-      const filename = path.split('/').pop();
-      addDictionary(text, filename);
-      $("#dictStatus").textContent = "辞書fetch OK";
-      $("#wordlistPath").value = ""; // Clear input for next fetch
-    } catch (e) {
-      $("#dictStatus").textContent = `fetch失敗: ${e.message}`;
-    }
+  $('#addPastedBtn').addEventListener('click', () => {
+    const area = $('#pasteWords');
+    if (!area.value.trim()) return setStatus($('#dictStatus'), t('dict.errorPasteEmpty'), true);
+    pasteCount += 1;
+    addUserDictionary('paste', t('dict.pasted', { n: pasteCount }), area.value);
+    area.value = '';
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  // Initialize dictionary first
-  rebuildDictStructures();
-  
-  $("#dictStatus").textContent = "辞書：内蔵ミニ辞書（18語）";
-  updateDictionaryStats();
-  updateDictionaryDisplay();
-  initTabSwitching();
+// ===== Init =====
+async function init() {
+  initThemeToggle($('#btnTheme'));
+  initTabs($('.tab-nav'));
   bindEvents();
-});
+  rebuildIndex();
+  document.documentElement.setAttribute('data-ready', 'true');
+  if (IS_FILE) {
+    const note = $('#dictProtocolNote');
+    note.textContent = t('dict.fileProtocol');
+    note.hidden = false;
+    return;
+  }
+  // 一般的な英単語の付属辞書を最初から読み込む
+  const defaults = sources.filter((s) => s.kind === 'bundled' && DEFAULT_WORDLISTS.includes(s.id));
+  await Promise.all(defaults.map((s) => loadBundled(s)));
+  rebuildIndex();
+}
+
+init();

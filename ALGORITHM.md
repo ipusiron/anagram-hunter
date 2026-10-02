@@ -1,15 +1,17 @@
 # アナグラム探索アルゴリズム詳細解説
 
-このドキュメントでは、Anagram Hunterで実装されているアナグラム探索アルゴリズムについて詳細に解説します。
+このドキュメントでは、Anagram Hunterで実装されているアナグラム探索アルゴリズムについて詳細に解説します。コードはすべて`js/anagram-core.js`にあり、`test/core.test.js`と`test/wordlists.test.js`が動作を検証しています。
 
 ## 目次
 
 1. [基本概念](#基本概念)
 2. [データ構造](#データ構造)
-3. [単語アナグラム探索](#単語アナグラム探索)
-4. [2語アナグラム探索](#2語アナグラム探索)
-5. [計算量分析](#計算量分析)
-6. [最適化手法](#最適化手法)
+3. [正規化](#正規化)
+4. [単語アナグラム探索](#単語アナグラム探索)
+5. [2語アナグラム探索](#2語アナグラム探索)
+6. [計算量分析](#計算量分析)
+7. [実装上の注意点](#実装上の注意点)
+8. [今後の改善案](#今後の改善案)
 
 ---
 
@@ -20,12 +22,12 @@
 
 **例:**
 - `LISTEN` → `SILENT`, `ENLIST`, `INLETS`
-- `HEART` → `EARTH`, `HATER`
+- `DORMITORY` → `DIRTY ROOM`
 
 ### 探索の種類
-1. **完全変位アナグラム**: 入力文字をすべて使用（例：LISTEN → SILENT）
-2. **部分使用アナグラム**: 入力文字の一部のみ使用（例：LISTEN → NEST）
-3. **2語アナグラム**: 2つの単語の組み合わせ（例：LISTEN → SIT + LEN）
+1. **全文字を使う語**: 入力文字をすべて使用（例：LISTEN → SILENT）
+2. **一部の文字を使う語**: 入力文字の一部のみ使用（例：LISTEN → NEST、残りの文字はIL）
+3. **2語アナグラム**: 入力文字をちょうど使い切る2つの単語の組み合わせ（例：FIREWALL → FIRE + WALL）
 
 ---
 
@@ -35,110 +37,96 @@
 文字列の文字をアルファベット順にソートした文字列。同じ署名を持つ単語は互いにアナグラムの関係にある。
 
 ```javascript
-function toSignature(s) {
-  return s.split("").sort().join("");
+export function signature(word) {
+  return word.split('').sort().join('');
 }
 
 // 例
-toSignature("LISTEN"); // → "EILNST"
-toSignature("SILENT"); // → "EILNST"
-toSignature("ENLIST"); // → "EILNST"
+signature('LISTEN'); // → 'EILNST'
+signature('SILENT'); // → 'EILNST'
+signature('ENLIST'); // → 'EILNST'
 ```
 
 ### 2. 頻度ベクトル
-各文字（A-Z）の出現回数を26次元ベクトルで表現。文字の包含関係を効率的にチェック可能。
+各文字（A-Z）の出現回数を26次元ベクトル（`Uint8Array`）で表現。文字の包含関係を効率的にチェック可能。
 
 ```javascript
-function freqVecFromString(s) {
-  const v = new Array(26).fill(0);
-  for (const ch of s) {
-    const i = ch.charCodeAt(0) - 65; // A=0, B=1, ..., Z=25
-    if (i >= 0 && i < 26) v[i]++;
+export function freqVector(word) {
+  const v = new Uint8Array(26);
+  for (let i = 0; i < word.length; i++) {
+    const k = word.charCodeAt(i) - 65; // A=0, B=1, ..., Z=25
+    if (k >= 0 && k < 26) v[k] += 1;
   }
   return v;
 }
 
-// 例
-freqVecFromString("LISTEN"); // → [0,0,0,0,1,0,0,0,1,0,0,1,0,1,0,0,0,0,1,1,0,0,0,0,0,0]
-//                                  A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
-//                                  0 0 0 0 1 0 0 0 1 0 0 1 0 1 0 0 0 0 1 1 0 0 0 0 0 0
+// 例: LISTEN
+// A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+// 0 0 0 0 1 0 0 0 1 0 0 1 0 1 0 0 0 0 1 1 0 0 0 0 0 0
 ```
 
-### 3. 主要データ構造
+頻度ベクトルは署名と同じ情報を持っており、`vectorToSignature`で署名に戻せます（各文字をその個数だけABC順に並べる）。
+
+### 3. 索引
 
 ```javascript
-let WORDS = [];                // 正規化された全単語リスト
-let SIG2WORDS = new Map();     // 署名 → 単語配列のマップ
-let WORD_FREQ = new Map();     // 単語 → 頻度ベクトルのマップ
+// buildIndex(wordLists) が返すもの
+{
+  words,        // 正規化して重複を除いた全単語（複数の辞書をまとめたもの）
+  bySignature,  // Map: 署名 → 単語の配列
+  freq          // Map: 単語 → 頻度ベクトル
+}
 ```
+
+---
+
+## 正規化
+
+入力も辞書の各行も、同じ`normalizeLetters`でA〜Zの大文字にそろえます。
+
+1. NFKCで全角英字を半角にする（`ＬＩＳＴＥＮ` → `LISTEN`）
+2. NFDでアクセント記号を分けて外す（`café` → `CAFE`）
+3. 大文字にして英字だけを残す。空白は区切りとして数えず、それ以外の英字でない文字（数字・記号・かな）は「無視した文字」として数える
+
+辞書は1行に1語として読み、英字だけに直したあとで重複を除きます（`a-dream`と`adream`は同じ`ADREAM`になります）。
 
 ---
 
 ## 単語アナグラム探索
 
-### アルゴリズム概要
-
-1. **完全変位の探索**: 署名マップを使用
-2. **部分使用の探索**: 頻度ベクトルで包含チェック
-
-### 実装詳細
+辞書の各語について、入力の文字で作れるか（頻度ベクトルの各成分が入力以下か）を確かめます。作れる語のうち、残りの文字がない語が「全文字を使う語」、残りがある語が「一部の文字を使う語」です。
 
 ```javascript
-function anagramsOneWord(letters, filters) {
-  const sig = toSignature(letters);
-  const have = freqVecFromString(letters);
-  
-  // 1. 完全変位アナグラム（署名一致）
-  const exactList = SIG2WORDS.get(sig) || [];
-  const outExact = exactList.filter(w => passFilters(w, filters));
-  
-  // 2. 部分使用アナグラム（頻度ベクトル包含）
-  const outSub = [];
-  for (const w of WORDS) {
-    const fv = WORD_FREQ.get(w);
-    if (!canCover(fv, have)) continue; // 包含チェック
-    if (!passFilters(w, filters)) continue;
-    outSub.push(w);
+export function findSingle(index, letters, filters) {
+  const have = freqVector(letters);
+  const out = [];
+  for (const w of index.words) {
+    if (w.length > letters.length || !passFilters(w, filters)) continue;
+    const fv = index.freq.get(w);
+    if (!canCover(fv, have)) continue;
+    const rest = vectorToSignature(subtract(have, fv));
+    out.push({ word: w, kind: rest ? 'partial' : 'exact', rest });
   }
-  
-  // 3. 結果のマージと重複除去
-  const set = new Set();
-  const res = [];
-  
-  for (const w of outExact) {
-    if (!set.has(w)) { 
-      res.push({ kind: "1語(完全変位)", word: w }); 
-      set.add(w); 
-    }
-  }
-  
-  for (const w of outSub) {
-    if (!set.has(w)) { 
-      res.push({ kind: "1語(部分使用)", word: w }); 
-      set.add(w); 
-    }
-  }
-  
-  return res;
+  // 全文字を使う語が先、次に長い語、同じ長さはABC順
+  ...
 }
 ```
 
 ### 包含チェック関数
 
 ```javascript
-function canCover(need, have) {
-  // need <= have (各成分について)
-  for (let i = 0; i < 26; i++) {
-    if (need[i] > have[i]) return false;
-  }
+export function canCover(need, have) {
+  for (let i = 0; i < 26; i++) if (need[i] > have[i]) return false;
   return true;
 }
 ```
 
 **例**: `LISTEN`で`NEST`が作れるか？
-- LISTEN: `[0,0,0,0,1,0,0,0,1,0,0,1,0,1,0,0,0,0,1,1,0,0,0,0,0,0]`
-- NEST:   `[0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0]`
-- 判定: NEST ≤ LISTEN → **True**（作れる）
+- LISTEN: E1 I1 L1 N1 S1 T1
+- NEST: E1 N1 S1 T1
+- 判定: NEST ≤ LISTEN → **True**（作れる）。残りの文字は`IL`
+
+最大の長さ・最小の長さは、見つかる語の長さにだけ掛かります。入力の長さは制限しません（画面では入力の英字を100字までにしています）。
 
 ---
 
@@ -146,185 +134,110 @@ function canCover(need, have) {
 
 ### アルゴリズム概要
 
-2語アナグラムは組み合わせ爆発を起こしやすいため、ビーム探索で計算量を制御。
+2語の組（w1, w2）で入力の文字をちょうど使い切るとき、w1を決めると、w2の文字は「入力からw1を引いた残り」に決まります。つまりw2の署名は残りの文字の署名そのものです。署名の索引を1回引けば、w2の候補がすべて手に入ります。
 
-### 実装手順
+1. 辞書の各語w1について、入力より短く、入力の文字で作れるかを確かめる（1語目の候補）
+2. 残りの文字の頻度ベクトルを署名に戻す
+3. 索引でその署名の語をすべて取り出し、それぞれをw2とする
+4. 組はABC順の2語で1回だけ数える（w1とw2を入れ替えた組は同じ組）
 
-1. **候補1語目の絞り込み**: 頻度ベクトルで包含チェック
-2. **ビーム選択**: 長い単語優先でビーム幅まで選択
-3. **2語目の探索**: 残差ベクトルを使用
-4. **完全変位チェック**: 残差がゼロベクトルになるかチェック
-
-### 実装詳細
+辞書を1回なめるだけで、取りこぼしのない全探索になります。
 
 ```javascript
-function anagramsTwoWords(letters, filters, beamWidth = 200, topN = 200) {
-  const have = freqVecFromString(letters);
-  
-  // Step 1: 1語目候補の絞り込み
-  const cand1 = [];
-  for (const w of WORDS) {
-    const fv = WORD_FREQ.get(w);
-    if (!canCover(fv, have)) continue;        // 包含チェック
-    if (!passFilters(w, filters)) continue;   // フィルターチェック
-    cand1.push(w);
-  }
-  
-  // Step 2: ビーム選択（長い単語優先）
-  cand1.sort((a,b) => b.length - a.length || a.localeCompare(b));
-  const beams = cand1.slice(0, beamWidth);
-  
-  // Step 3: 各ビームについて2語目を探索
-  const results = [];
-  
-  outer: for (const w1 of beams) {
-    const rem = subVec(have, WORD_FREQ.get(w1)); // 残差計算
-    
-    for (const w2 of WORDS) {
-      const fv2 = WORD_FREQ.get(w2);
-      if (!canCover(fv2, rem)) continue;        // 残差包含チェック
+export function findPairs(index, letters, filters) {
+  const have = freqVector(letters);
+  const seen = new Set();
+  const pairs = [];
+  let firstCandidates = 0;
+  for (const w1 of index.words) {
+    if (w1.length >= letters.length || !passFilters(w1, filters)) continue;
+    const fv = index.freq.get(w1);
+    if (!canCover(fv, have)) continue;
+    firstCandidates += 1;
+    const rest = vectorToSignature(subtract(have, fv));
+    for (const w2 of index.bySignature.get(rest) || []) {
       if (!passFilters(w2, filters)) continue;
-      
-      const rem2 = subVec(rem, fv2);            // 最終残差
-      if (!isZeroVec(rem2)) continue;           // 完全変位チェック
-      
-      // 発見！
-      const pair = [w1, w2].sort(); // 正規化
-      results.push({ 
-        kind: "2語(完全変位)", 
-        pair, 
-        len: pair[0].length + pair[1].length 
-      });
-      
-      if (results.length >= topN) break outer;  // 上限チェック
+      const words = w1 <= w2 ? [w1, w2] : [w2, w1];
+      const key = words.join(' ');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pairs.push({ words, length: letters.length });
     }
   }
-  
-  return results;
-}
-```
-
-### ベクトル演算
-
-```javascript
-// ベクトル減算
-function subVec(a, b) {
-  const out = new Array(26);
-  for (let i = 0; i < 26; i++) out[i] = a[i] - b[i];
-  return out;
-}
-
-// ゼロベクトル判定
-function isZeroVec(v) {
-  for (let i = 0; i < 26; i++) if (v[i] !== 0) return false;
-  return true;
+  // 短いほうの語が長い組を先に（3字＋5字より4字＋4字）、次にABC順
+  ...
 }
 ```
 
 ### 探索例
 
-`LISTEN` → `LIT` + `SEN` を見つける過程：
+`FIREWALL` → `FIRE` + `WALL`を見つける過程：
 
-1. **初期状態**: `LISTEN` = `[0,0,0,0,1,0,0,0,1,0,0,1,0,1,0,0,0,0,1,1,0,0,0,0,0,0]`
+1. **入力**: `FIREWALL`の署名は`AEFILLRW`
+2. **1語目**: `FIRE`（署名`EFIR`）はFIREWALLの文字で作れる
+3. **残り**: `AEFILLRW`から`EFIR`を引くと`ALLW`
+4. **2語目**: 索引で署名`ALLW`を引くと`WALL`が見つかる
+5. **結果**: `FIRE WALL`
 
-2. **1語目選択**: `LIT` = `[0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0]`
+付属辞書を最初から使う状態（3,233語）では、FIREWALLの1語目の候補は33語で、FAIR WELL・FALL WIRE・FEAR WILL・FILL WEAR・FIRE WALL・LAW RIFLEの6組が見つかります。
 
-3. **残差計算**: 
-   ```
-   LISTEN - LIT = [0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0]
-   ```
-
-4. **2語目探索**: `SEN` = `[0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0]`
-
-5. **最終残差**: 
-   ```
-   残差 - SEN = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] ✓
-   ```
-
-6. **結果**: `LIT SEN` が2語アナグラムとして発見
+### 同じ語を2回使う組
+`TEAMTEAM`のように、同じ語を2回使うと入力をちょうど使い切る場合は、その組（`MATE MATE`など）も結果に含めます。
 
 ---
 
 ## 計算量分析
 
-### 単語アナグラム探索
+Nを辞書の語数、Lを入力の長さとします。
 
-- **完全変位**: O(1) - 署名による直接検索
-- **部分使用**: O(N) - N: 辞書サイズ
-- **全体**: O(N)
+### 単語アナグラム探索
+- 各語について26文字の比較と、残りの文字の署名づくり: O(N × 26)
+- 結果の並べ替え: O(K log K)（Kは見つかった語の数）
 
 ### 2語アナグラム探索
+- 1語目の候補の絞り込み: O(N × 26)
+- 候補ごとに署名を1回引く: O(C × 26)（Cは1語目の候補の数）
+- 全体: O(N × 26 ＋ 結果の数)
 
-- **候補絞り込み**: O(N)
-- **ビーム選択**: O(N log N) - ソート
-- **2語目探索**: O(B × N) - B: ビーム幅
-- **全体**: O(B × N)
+どちらも辞書を1回なめるだけで、入力の長さにはほとんど左右されません。付属辞書を最初から使う状態では、2語の探索は1ミリ秒未満で終わります（Node.js 22での実測で0.2〜0.7ms）。
 
-**ビーム幅の効果**:
-- B = 200, N = 5000の場合: 最大100万回の比較
-- ビーム幅を制限することで実用的な速度を実現
-
----
-
-## 最適化手法
-
-### 1. 署名インデックス
-同じ署名を持つ単語を事前にグループ化することで、完全変位アナグラムをO(1)で検索。
-
-### 2. 頻度ベクトルキャッシュ
-各単語の頻度ベクトルを事前計算してキャッシュ。包含チェックを高速化。
-
-### 3. ビーム探索
-2語アナグラムの組み合わせ爆発を制御。長い単語を優先することで有用な結果を効率的に発見。
-
-### 4. 早期終了
-- 上位N件に達したら探索終了
-- 残差チェックで不可能な組み合わせを早期除外
-
-### 5. メモリ効率
-- 26次元の小さなベクトルで文字情報を表現
-- Map構造による効率的な検索
+**総当たりとの比較**: すべての語の組を調べるとO(N²)になり、3,233語では約1千万組です。`test/core.test.js`では、小さな辞書で署名の引き当てと総当たりが同じ組を返すことを確かめています。
 
 ---
 
 ## 実装上の注意点
 
 ### 1. 正規化
-全ての入力をA-Zの大文字に正規化。一貫性を保つことで検索の確実性を向上。
+入力と辞書を同じ関数でA-Zの大文字にそろえます。正規化の仕方が違うと、同じ語が別の語として扱われます。
 
 ### 2. 重複除去
-署名検索と頻度ベクトル検索の結果をマージする際、Setを使用して重複を除去。
+1つの辞書の中の重複（付属辞書english_5067.txtは5,068行のうち2,123行が重複）と、複数の辞書のあいだの重複は、索引を作るときに1つにまとめます。
 
 ### 3. フィルター適用
-長さ・パターンマッチなどのフィルターを適切なタイミングで適用し、無駄な計算を削減。
+長さ・先頭・末尾・含む文字列の条件は、2語の探索では両方の語に掛けます。
 
-### 4. エラーハンドリング
-辞書が空の場合や、入力が無効な場合の適切な処理。
+### 4. 表示と書き出し
+画面には上限（既定200件）までを出し、CSV・JSONには全件を書き出します。辞書名や結果は`textContent`で画面に入れ、HTMLとして解釈させません。
 
 ---
 
 ## 今後の改善案
 
-### 1. Trie構造の導入
-前置辞フィルターの高速化。特に長い単語リストでの性能向上が期待される。
+### 1. 3語以上の組
+2語の探索を再帰的に広げます。語数の上限と、探索の手数の上限が必要です。
 
-### 2. 並列処理
-Web Workerを使用した並列探索。大規模辞書での応答性向上。
+### 2. 単語の使われやすさによる並べ替え
+出典の確かな頻度表があれば、よく使われる語を含む組を先に出せます。
 
-### 3. 増分探索
-文字追加時の差分計算による高速化。
-
-### 4. 統計的最適化
-- 頻度の高い文字パターンの優先探索
-- 単語の使用頻度に基づく結果ランキング
+### 3. 位置の決まった文字
+クロスワードのように「2文字目がA」などの条件で絞り込みます。
 
 ---
 
 ## 参考文献・関連アルゴリズム
 
-1. **文字列アルゴリズム**: Suffix Arrays, Suffix Trees
-2. **組み合わせ最適化**: Branch and Bound, Beam Search
-3. **ハッシュ技法**: Rolling Hash, Perfect Hashing
-4. **情報検索**: Inverted Index, N-gram Analysis
+1. **文字列アルゴリズム**: ソートによる正規形（署名）、ハッシュ表による索引
+2. **組み合わせ探索**: 部分和問題、バックトラッキング
+3. **暗号解読**: 転置式暗号の多重アナグラム法（Russell, Clark, Stepney: Making the Most of Two Heuristics: Breaking Transposition Ciphers with Ants, CEC 2003）
 
 このアルゴリズムは教育目的で設計されており、実装の理解と改良を通じて文字列処理・探索アルゴリズムの学習に活用できます。
