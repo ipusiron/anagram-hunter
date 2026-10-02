@@ -21,7 +21,7 @@ const JA = {
   'dict.kindBundled': '付属',
   'dict.kindFile': 'ファイル',
   'dict.kindPaste': '貼り付け',
-  'dict.notLoaded': '未読み込み（チェックすると読み込みます）',
+  'dict.notLoaded': '{n} 語・未読み込み（チェックすると読み込みます）',
   'dict.remove': '削除',
   'dict.removeLabel': '{name} を一覧から外す',
   'dict.useLabel': '{name} を探索に使う',

@@ -90,7 +90,7 @@ function renderDictionaryList(focusKey = null) {
     box.dataset.key = s.key;
     let count;
     if (s.loading) count = t('dict.loading');
-    else if (!s.words) count = `${t('dict.words', { n: fmt(s.expected) })} ・ ${t('dict.notLoaded')}`;
+    else if (!s.words) count = t('dict.notLoaded', { n: fmt(s.expected) });
     else if (s.kind === 'builtin') count = t('dict.words', { n: fmt(s.words.length) });
     else count = wordCountText(s);
     const label = el('label', { class: 'dict-checkbox' }, [box, el('span', { class: 'dict-item-name', text: s.name })]);
