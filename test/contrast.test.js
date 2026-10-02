@@ -61,3 +61,11 @@ test('入力欄の文字は16px以上、操作の高さは44px以上', () => {
     assert.match(body, /min-height: 44px;/, sel);
   }
 });
+
+test('ヘッダーのボタン（言語・テーマ）は高さを固定し、並びの容器に引き伸ばされない', () => {
+  const body = css.slice(css.indexOf('.icon-btn {'), css.indexOf('}', css.indexOf('.icon-btn {')));
+  assert.match(body, /^\s+height: 44px;$/m);
+  assert.match(body, /flex: none;/);
+  assert.match(body, /white-space: nowrap;/);
+  assert.match(css, /\.header-actions \{ display: flex; align-items: center;/);
+});
