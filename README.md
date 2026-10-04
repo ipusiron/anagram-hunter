@@ -115,10 +115,12 @@ Anagram Hunterは、入力した文字を並べ替えて作れる英単語（ア
 
 ## 🔗 URLで文字列を渡す
 
-URLに`?text=`を付けると、その文字列を入力欄に入れた状態で開き、付属辞書を読み込んだあとに探索します。`&tab=`で開くタブを選べます（`single`・`two-word`・`phrase`・`builder`・`compare`。省略すると単語アナグラム）。ほかのツールや記事から、文字列を渡して開くときに使えます。
+URLに`#text=`（または`?text=`）を付けると、その文字列を入力欄に入れた状態で開き、付属辞書を読み込んだあとに探索します。`&tab=`で開くタブを選べます（`single`・`two-word`・`phrase`・`builder`・`compare`。省略すると単語アナグラム）。ほかのツールや記事から、文字列を渡して開くときに使えます。
 
-- `https://ipusiron.github.io/anagram-hunter/?text=DORMITORY&tab=two-word`
-- `https://ipusiron.github.io/anagram-hunter/?text=ELEVEN%20PLUS%20TWO&tab=phrase`
+- `https://ipusiron.github.io/anagram-hunter/#text=DORMITORY&tab=two-word`
+- `https://ipusiron.github.io/anagram-hunter/#text=ELEVEN%20PLUS%20TWO&tab=phrase`
+- `#`より後ろはサーバーへ送られない。`#`と`?`の両方にあれば`#`を優先する
+- 読み込んだあと、URLの`#`と`?`の両方から`text`を消す（`tab`・`lang`は残す）。開いたときのURLは、ブラウザーの閲覧履歴に残ることがある
 - `compare`では文字列Aの欄に入れるだけで、比べるのはBを入れてから
 - 言語は`?lang=ja`・`?lang=en`で指定できる
 
@@ -193,7 +195,7 @@ URLに`?text=`を付けると、その文字列を入力欄に入れた状態で
 - 入力した文字・読み込んだ辞書は、ブラウザーの中だけで扱う。サーバーへの送信や保存はしない（ページを閉じると辞書は消える）
 - Content Security Policy（meta）で、スクリプト・スタイル・通信先を同じサイトに限る。インラインのスクリプトやイベントハンドラーは使わない
 - 辞書名（ファイル名）や結果は、すべて`textContent`で画面に入れる（HTMLとして解釈しない）
-- 付属辞書は一覧にあるファイルだけを読む。自分の辞書はファイル選択か貼り付けで渡す（任意のURLは読まない）。URLの`?text=`は入力欄に入れるだけで、400字までに切る
+- 付属辞書は一覧にあるファイルだけを読む。自分の辞書はファイル選択か貼り付けで渡す（任意のURLは読まない）。URLの`#text=`・`?text=`は入力欄に入れるだけで、400字までに切る
 - 読み込むファイルは10MB・50万語まで
 - 英辞郎・Wiktionaryへのリンクは`rel="noopener noreferrer"`で開き、参照元も送らない
 - localStorageには、言語とテーマの選択だけを保存する
@@ -250,7 +252,7 @@ anagram-hunter/
 │   ├── file-check.js         # file://で起動できなかったときの案内
 │   ├── i18n.js               # 画面の言語（日本語・英語）の決定と切り替え
 │   ├── messages.js           # 画面に出す文言（日本語・英語）
-│   ├── params.js             # URLの?text=・?tab=で入力を受け取る
+│   ├── params.js             # URLの#text=・tab=（または?）で入力を受け取る
 │   ├── tabs.js               # タブの切り替え（キーボード操作を含む）
 │   ├── theme-init.js         # 読み込みの最初にテーマを当てる
 │   ├── theme.js              # ライト／ダークの切り替え
@@ -262,7 +264,7 @@ anagram-hunter/
 │   ├── html.test.js          # CSP・要素のid・タブの役割・ラベル
 │   ├── i18n.test.js          # 日英の辞書のキー・英語に日本語がないこと・初期の言語
 │   ├── messages.test.js      # 文言の置き場所とキー
-│   ├── params.test.js        # ?text=・?tab=の読み取り
+│   ├── params.test.js        # #text=・?text=の読み取りとURLから消す処理
 │   ├── phrase.test.js        # フレーズ・位置の指定・2つの比較・大きい辞書
 │   ├── readme.test.js        # READMEの表・構成・ツリー・画像（日本語版と英語版）
 │   └── wordlists.test.js     # 付属辞書の語数と既知解答

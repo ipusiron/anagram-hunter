@@ -14,7 +14,7 @@ Anagram Hunter - 辞書の署名で探すアナグラム探索ツール. A stati
 - **js/wordlists.js**: Built-in mini dictionary (19 words) and the bundled wordlist table (file, line count, unique word count). `twelvedicts` = 12dicts 3of6game (public domain, see `wordlists/12dicts-NOTICE.md`), not loaded by default
 - **js/messages.js**: All UI strings, Japanese and English with identical keys. Logic returns keys and values only
 - **js/i18n.js**: Initial language (`?lang=` → saved choice → browser language) and `applyStaticText`
-- **js/params.js**: Reads `?text=` (max 400 chars) and `?tab=`
+- **js/params.js**: Reads `#text=` (preferred; not sent to the server) or `?text=` (max 400 chars) and `tab`; `#` wins. After reading, `urlWithoutText` removes `text` from both `#` and `?` (`history.replaceState`)
 - **js/tabs.js / theme.js / theme-init.js / file-check.js**: Tabs with arrow keys, light/dark theme, notice when opened via `file://`
 - **style.css**: Color tokens on `:root`, dark overrides for `data-theme="dark"` and `prefers-color-scheme`
 
