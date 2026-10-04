@@ -79,10 +79,12 @@ When opened from the public version (HTTPS), the two general English dictionarie
 
 ## 🔗 Passing letters in the URL
 
-Add `?text=` to the URL to open the tool with those letters in the input field; the search runs after the bundled dictionaries are loaded. Use `&tab=` to choose the tab (`single`, `two-word`, `phrase`, `builder` or `compare`; the default is one word). This is useful for opening the tool with letters from another tool or an article.
+Add `#text=` (or `?text=`) to the URL to open the tool with those letters in the input field; the search runs after the bundled dictionaries are loaded. Use `&tab=` to choose the tab (`single`, `two-word`, `phrase`, `builder` or `compare`; the default is one word). This is useful for opening the tool with letters from another tool or an article.
 
-- `https://ipusiron.github.io/anagram-hunter/?text=DORMITORY&tab=two-word`
-- `https://ipusiron.github.io/anagram-hunter/?text=ELEVEN%20PLUS%20TWO&tab=phrase`
+- `https://ipusiron.github.io/anagram-hunter/#text=DORMITORY&tab=two-word`
+- `https://ipusiron.github.io/anagram-hunter/#text=ELEVEN%20PLUS%20TWO&tab=phrase`
+- The part after `#` is not sent to the server. If both `#` and `?` have it, `#` wins
+- After reading, `text` is removed from both `#` and `?` in the URL (`tab` and `lang` stay). The URL as opened may remain in the browser history
 - With `compare`, the letters only go into field A; enter B and then compare
 - The language can be chosen with `?lang=ja` or `?lang=en`
 
@@ -157,7 +159,7 @@ Sets are listed with fewer words first, then with the longest shortest word firs
 - The letters you enter and the dictionaries you load are handled only inside the browser. Nothing is sent to or stored on a server (loaded dictionaries disappear when you close the page)
 - A Content Security Policy (meta) limits scripts, styles and connections to the same site. No inline scripts or event handlers are used
 - Dictionary names (file names) and results are always put on the screen with `textContent` (never interpreted as HTML)
-- Bundled dictionaries are read only from the files in the list. Your own dictionaries come from file selection or pasting (no arbitrary URL is read). `?text=` in the URL only fills the input field and is cut to 400 characters
+- Bundled dictionaries are read only from the files in the list. Your own dictionaries come from file selection or pasting (no arbitrary URL is read). `#text=` or `?text=` in the URL only fills the input field and is cut to 400 characters
 - Files to load are limited to 10 MB and 500,000 words
 - Links to Wiktionary and Eijiro open with `rel="noopener noreferrer"` and send no referrer
 - Only the choices of language and theme are saved in localStorage
@@ -214,7 +216,7 @@ anagram-hunter/
 │   ├── file-check.js         # Notice when the tool cannot start from file://
 │   ├── i18n.js               # Choosing and switching the screen language (Japanese and English)
 │   ├── messages.js           # Screen texts (Japanese and English)
-│   ├── params.js             # Reads ?text= and ?tab= from the URL
+│   ├── params.js             # Reads #text= and tab= (or ?) from the URL
 │   ├── tabs.js               # Tab switching (including keyboard operation)
 │   ├── theme-init.js         # Applies the theme at the very start of loading
 │   ├── theme.js              # Light and dark switching
@@ -226,7 +228,7 @@ anagram-hunter/
 │   ├── html.test.js          # CSP, element ids, tab roles, labels
 │   ├── i18n.test.js          # Japanese and English keys, no Japanese in English, initial language
 │   ├── messages.test.js      # Where texts are kept and their keys
-│   ├── params.test.js        # Reading ?text= and ?tab=
+│   ├── params.test.js        # Reading #text= and ?text=, and removing them from the URL
 │   ├── phrase.test.js        # Phrases, letter positions, comparison, large dictionary
 │   ├── readme.test.js        # README tables, structure, tree and images (Japanese and English)
 │   └── wordlists.test.js     # Bundled dictionary counts and known answers
