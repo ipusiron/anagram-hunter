@@ -141,6 +141,14 @@ Sets are listed with fewer words first, then with the longest shortest word firs
 
 ## 🎯 Use cases
 
+Ways of using this tool in particular
+
+- Counting the letters needed to change a letter board (shop letter boards, notices, cut-out letter crafts): compare SUMMER SALE with AUTUMN SALE in "Compare", and the letters to take down are E, M, R, S and the letters missing are A, N, T, U, one of each. Before changing the board, you see at once which letters to buy and which are left over (only letters are counted; spaces, digits and symbols are not)
+- Spotting fake domain names made by swapping letters (security education): PAYPAL and PAYAPL, and MICROSOFT and MICORSOFT, come out as anagrams of each other in "Compare". They only reorder the same letters, so looking at which letters and how many cannot tell them apart. G00GLE (the digit 0 in place of O), on the other hand, differs from GOOGLE by two Os, since only letters are counted. It helps explain the difference between swapping letters and replacing them with look-alikes (it does not decide what is genuine; check the correct domain name in official guidance)
+- Checking subtraction of letter counts (an answer key for a programming exercise): "can one string be made from the letters of the other" is a standard exercise solved by subtracting the counts of each of the 26 letters (frequency vectors). Comparing WELCOME with CLOSED shows that the D and S that CLOSED needs are not in WELCOME, so it cannot be made. When writing test cases for your own solution, the tool's result can serve as the expected answer (upper and lower case are treated the same, and anything but letters is not counted)
+
+General uses
+
 - Learning transposition ciphers: a transposition cipher only moves letters around, so the ciphertext is an anagram of the plaintext. Rearrange a short ciphertext with the phrase search or the builder to find plaintext candidates, and see how columnar transposition works in [Columnar CipherLab (Day043)](https://ipusiron.github.io/columnar-cipherlab/)
 - CTF and puzzle questions: check hints of the type "rearrange the words of the question to get the answer" with one word, two words or phrases. Question setters can check whether the answer has other rearrangements (alternative solutions)
 - OSINT practice: use "Compare" to check whether a handle or pen name is a rearrangement of another name, and paste a list of candidate names as a dictionary to search. A match is not proof that two names belong to the same person; it is only one clue

@@ -205,3 +205,22 @@ test('ALGORITHM.md の探索例（FIREWALL の1語目の候補の数と6組、�
   const ph = findPhrases(defaultIndex, 'ELEVENPLUSTWO', F3, { maxWords: 3, allowRepeat: false });
   assert.ok(doc.includes(`候補は${ph.candidates}語、手数は${ph.steps}で、TWELVE PLUS ONEを含む${ph.phrases.length}組`));
 });
+
+test('ユースケースの「このツールならではの使い方」の例は比較の結果と一致する（日英）', async () => {
+  const { compareLetters } = await import('../js/anagram-core.js');
+  const [ja, en] = [read('README.md'), read('README.en.md')];
+  const list = (items) => items.map((x) => x.letter + (x.count > 1 ? x.count : '')).join('');
+  const board = compareLetters('SUMMER SALE', 'AUTUMN SALE');
+  assert.deepEqual([list(board.onlyA), list(board.onlyB)], ['EMRS', 'ANTU']);
+  assert.ok(ja.includes('外す文字はE・M・R・S、足りない文字はA・N・T・Uで、どちらも1枚ずつ'));
+  assert.ok(en.includes('take down are E, M, R, S and the letters missing are A, N, T, U, one of each'));
+  for (const [a, b] of [['PAYPAL', 'PAYAPL'], ['MICROSOFT', 'MICORSOFT']]) {
+    assert.equal(compareLetters(a, b).isAnagram, true);
+    for (const text of [ja, en]) assert.ok(text.includes(`${a}と${b}`) || text.includes(`${a} and ${b}`), a);
+  }
+  const zero = compareLetters('GOOGLE', 'G00GLE');
+  assert.deepEqual([zero.isAnagram, list(zero.onlyA), list(zero.onlyB)], [false, 'O2', '']);
+  const room = compareLetters('WELCOME', 'CLOSED');
+  assert.deepEqual([room.aContainsB, list(room.onlyB)], [false, 'DS']);
+  assert.ok(ja.includes('CLOSEDに要るDとSがWELCOMEになく') && en.includes('the D and S that CLOSED needs are not in WELCOME'));
+});
